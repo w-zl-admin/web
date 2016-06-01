@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  
+  
+    
+    <entry>
+      <title><![CDATA[利用决策树来识别Cufflinks中的技术噪音]]></title>
+      <url>http://www.w-zl.com/2015/07/26/%E5%88%A9%E7%94%A8%E5%86%B3%E7%AD%96%E6%A0%91%E6%9D%A5%E8%AF%86%E5%88%ABCufflinks%E4%B8%AD%E7%9A%84%E6%8A%80%E6%9C%AF%E5%99%AA%E9%9F%B3.html</url>
+      <content type="html"><![CDATA[<h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>熟悉RNA-Seq分析流程的朋友大多都知道，在经典的TopHat-Cufflinks分析流程中，对于最终的转录子（transfrag）组装的结果，很难去判断是否真实存在。在实际操作中，我们一般采用简单的一刀切，来进行过滤。比如，对于FPKM&lt;1的进行过滤。这种方法虽然很有效，但是可能会丢失部分有价值的信息。在这篇文章中，我向大家介绍一种基于决策树的机器学习方法来识别Cufflins结果中的技术噪音（Tech Noise）。</p>
+<h2 id="决策树"><a href="#决策树" class="headerlink" title="决策树"></a>决策树</h2><h3 id="什么是决策树"><a href="#什么是决策树" class="headerlink" title="什么是决策树"></a>什么是决策树</h3><p>决策树是一种依托选择策略建立的图解法。在机器学习中，决策树属于有督导学习（Supervised Learning）中分类（Classification）算法范围。决策树，经常出现在我们生活中。比如，</p>
+<blockquote>
+<p>顾客：这手机能拍照吗？<br>销售：能！<br>顾客：这手机能上网吗？<br>销售：能！<br>顾客：这手机能防水吗？<br>销售：能！<br>顾客：我买了！ </p>
+</blockquote>
+<p>用图解法表示决策过程：<br><img src="/upload/1/decisionTreeSample.png" alt="买手机决策过程图解" title="买手机决策树"><br>这样，有了上面的认识，我们可以发现：</p>
+<ul>
+<li>决策树是一个树结构（可以是二叉树或非二叉树）。</li>
+<li>决策树上的每个非叶节点表示了对某一属性的判断。</li>
+<li>非叶节点的分支表示该属性的判断结果。</li>
+<li>叶节点表示分类结果。</li>
+</ul>
+<h3 id="决策树分类算法"><a href="#决策树分类算法" class="headerlink" title="决策树分类算法"></a>决策树分类算法</h3><p>决策树中最关键步骤是分裂属性。什么是分裂属性？分裂属性是指在某个节点，根据对某个属性的判断来把该节点集合分裂为两个或多个子集合（二叉树或多叉树）。理想的分裂，应该使各个子集合中的各个元素的类别一致。这样一来，分裂属性的情况包括以下三种：</p>
+<ul>
+<li>属性是离散值且不要求生成二叉决策树。此时用属性的每一个划分作为一个分支。</li>
+<li>属性是离散值且要求生成二叉决策树。此时使用属性划分的一个子集进行测试，按照“属于此子集”和“不属于此子集”分成两个分支。</li>
+<li>属性是连续值。此时确定一个值作为分裂点split_point，按照&gt;split_point和&lt;=split_point生成两个分支。  </li>
+</ul>
+<p>这样看来，属性的量度对于决策树的构造非常重要。选择属性度量的算法有很多，大部分都是采用自顶向下递归分治法（Recursive Partitioning），同时采用不回溯的贪心策略（Greedy Strategy）。</p>
+<h4 id="ID3算法"><a href="#ID3算法" class="headerlink" title="ID3算法"></a>ID3算法</h4><p>ID3算法，全称Iterative Dichotomiser 3 ，译名迭代二叉树3代，1986年由Quinlan提出。ID3算法是以信息论为基础，以信息熵和信息增益度为衡量标准，从而实现对数据的归纳分类。即在节点处选择当前集合中最大信息增益的属性作为分裂属性，并在子集中不断递归。以下是信息论中的基本概念：</p>
+<ul>
+<li>信息熵（Entropy）<br>若信源符号有n种取值：$U_1$…$U_i$…$U_n$，对应概率为：$P_1$…$P_i$…$P_n$，且各种符号的出现彼此独立。这时，信源的平均不确定性应当为单个符号不确定性$-logP_i$的统计平均值（$E$），可称为信息熵，即$$H(U)=E\left | -logP_i \right |=\sum_{i=0}^{n}P_ilogP_i$$式中对数一般取2为底，单位为比特。但是，也可以取其它对数底，采用其它相应的单位，它们间可用换底公式换算。 信息熵是表示随机变量不确定性的度量。从直观上，信息熵越大，变量包含的信息量越大，变量的不确定性也越大。一个事物内部会存在随机性，也就是不确定性，而从外部消除这个不确定性唯一的办法是引入信息。如果没有信息，任何公式或者数字的游戏都无法排除不确定性。<br><img src="/upload/1/EntropyFunction.png" alt="信息熵函数" title="信息熵函数"><br><img src="/upload/1/towbit.png" alt="二元信息熵" title="二元信息熵"></li>
+<li>复合熵（Composite Entropy）<br>根据贝叶斯定理，结合信息熵。复合熵函数：$$H(x,y)=E|-logP_{(x,y)}|=\sum_{x}^{ }\sum_{y}^{ }P_{(x,y)}logP_{(x,y)}=\sum_{x}^{ }\sum_{y}^{ }P_xP_ylog(P_xP_y)$$</li>
+<li>条件熵（conditional Entropy）<br>根据贝叶斯定理，结合信息熵。条件熵函数：$$H(X|Y)=E|E|-logP_{(X|Y)}||=\sum_{Y}^{}\sum_{X}^{}P_{Y_j}P_{(X_i|Y_j)}logP_{(X_i|Y_j)}$$</li>
+<li>信息增益（IG，Information Gain）<br>信息增益在信息论中是很有效的特征选择方法。但凡是特征选择，总是将特征的重要程度先进行量化后再进行选择，而如何量化特征的重要性，就成了各种方法最大的不同。在信息增益中，量化特征的重要性就是看特征能够为分类系统带来多少的信息，带来的信息越多，该特征就越为重要。这可以用信息熵去量化。另外需要注意的是，信息增益是针对特征而言，也就是系统中有没有某个特征间系统信息熵的变化。令$A$为分裂特征，$A_i$为A特征分裂子集，$S_n$为n类样本，$U$为所有样本集合，信息增益函数可以表示为：$$IG(A)=H(U)-H(U|A)=\sum_{j=1}^{S}\sum_{i=1}^{A}P_{A_i}P_{S_j|A_i}log(P_{S_j|A_i})-\sum_{j=1}^{S}P_{(S_j)}log(P_{(S_j)})$$</li>
+</ul>
+<p>ID3算法就是利用信息增益来量化特征的重要性。其理论在于，每次分裂实在使系统信息增益最大化的特征上进行。同时ID3只有正负两个样本（全局二叉树），根据信息增益函数，ID3可以表示为：<br>$$Max(IG(A_i))=Max(H(U)-H(U|A))=$$</p>
+<p>$$Max(P_A(P_{(\oplus|A)}logP_{(\oplus|A)}+P_{(\ominus|A)}logP_{(\ominus|A)})+(1-P_A)(P_{(\oplus|A’)}logP_{(\oplus|A’)}+P_{(\ominus|A’)}logP_{(\ominus|A’)})-P_{\oplus}logP_{\oplus}-P_{\ominus}logP_{\ominus})$$<br><strong>实例</strong><br>有类数据如下表，m,n为两个特征，c表示分类。</p>
+<table>
+<thead>
+<tr>
+<th>m</th>
+<th>n</th>
+<th>c</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>+</td>
+<td>+</td>
+<td>+</td>
+</tr>
+<tr>
+<td>+</td>
+<td>+</td>
+<td>+</td>
+</tr>
+<tr>
+<td>+</td>
+<td>-</td>
+<td>+</td>
+</tr>
+<tr>
+<td>-</td>
+<td>+</td>
+<td>-</td>
+</tr>
+<tr>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>+</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<p>根据ID3算法对其建决策树：</p>
+<ol>
+<li>以m特征进行分裂的信息增量。<br>$$IG(m)=H(U)-H(U|A)=-(\frac{1}{2}log_2\frac{1}{2}+\frac{1}{2}log_2\frac{1}{2})-(-\frac{4}{6}(\frac{1}{4}log_2\frac{1}{4}+\frac{3}{4}log_2\frac{3}{4})-\frac{2}{6}(0+0))=0.459$$<br><img src="/upload/1/mclass.png" alt="以m特征分裂" title="以m特征分裂"></li>
+<li>以n特征进行分裂的信息增量。<br>$$IG(n)=H(U)-H(U|A)=-(\frac{1}{2}log_2\frac{1}{2}+\frac{1}{2}log_2\frac{1}{2})-(-\frac{3}{6}(\frac{1}{3}log_2\frac{1}{3}+\frac{2}{3}log_2\frac{2}{3})-\frac{3}{6}(\frac{1}{3}log_2\frac{1}{3}+\frac{2}{3}log_2\frac{2}{3}))=0.082$$<br><img src="/upload/1/nclass.png" alt="以n特征分裂" title="以n特征分裂"></li>
+<li>因为$IG(m)&gt;IG(n)$，选择信息增益最大的特征进行分裂，所以选择m进行分裂。</li>
+</ol>
+<h4 id="C4-5算法"><a href="#C4-5算法" class="headerlink" title="C4.5算法"></a>C4.5算法</h4><p>C4.5算法是ID3算法进行改进算法，主要不同点是对特征重要性量化上采用的是信息增益率（Info Gain Ratio）。这种方法解决ID3算法在某个属性存在大量不同值时导致的过拟合现象。相比于ID3算法，改进有如下几个要点：</p>
+<ul>
+<li>用信息增益率来选择属性。</li>
+<li>在决策树构造过程中可以进行剪枝。ID3算法会由于某些具有很少元素的结点可能会使构造的决策树过适应（Overfitting），这时候不考虑这些结点可能会更好。</li>
+<li>对非离散数据也能处理。</li>
+<li>能够对不完整数据进行处理。<br><strong>信息增益率</strong><br>分裂属性$A$，分裂后子集空间$S$，信息增益率IGR则可表示为：<br>$$IGR(S,A)=\frac{IG(S,A)}{II(S,A)}$$<br>其中II表示内在信息（Intrinsic Information），其定义为：<br>$$II(S,A)=-\sum\frac{|S_i|}{|S|}log_2\frac{|S_i|}{|S|}$$<br>其中$S_i$是属性A分割S而形成的$i$子集。</li>
+</ul>
+<p><strong>实例</strong><br>依旧上述例子</p>
+<ul>
+<li>以m特征进行分裂的信息增量。$$IGR(m)=\frac{IG(m)}{II{m}}=\frac{0.459}{\frac{4}{6}log_2\frac{4}{6}+\frac{2}{6}log_2\frac{2}{6}}=\frac{0.459}{0.918}=0.5$$</li>
+</ul>
+]]></content>
+    </entry>
+    
+  
+  
+</search>
