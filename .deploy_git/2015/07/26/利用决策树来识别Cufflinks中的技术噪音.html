@@ -1,0 +1,1027 @@
+<!doctype html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+  <link href="/vendors/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css"/>
+
+
+
+
+  
+  
+  
+  
+
+  
+    
+    
+  
+
+  
+
+  
+
+  
+
+  
+
+  
+    
+    
+    <link href="//fonts.googleapis.com/css?family=Lato:300,300italic,400,400italic,700,700italic&subset=latin,latin-ext" rel="stylesheet" type="text/css">
+  
+
+
+
+
+<link href="/vendors/font-awesome/css/font-awesome.min.css?v=4.4.0" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.0.1" rel="stylesheet" type="text/css" />
+
+
+  <meta name="keywords" content="RNA-seq,决策树,Cufflinks,技术噪音," />
+
+
+
+
+
+
+
+
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.0.1" />
+
+
+
+
+
+
+<meta name="description" content="简介熟悉RNA-Seq分析流程的朋友大多都知道，在经典的TopHat-Cufflinks分析流程中，对于最终的转录子（transfrag）组装的结果，很难去判断是否真实存在。在实际操作中，我们一般采用简单的一刀切，来进行过滤。比如，对于FPKM&amp;lt;1的进行过滤。这种方法虽然很有效，但是可能会丢失部分有价值的信息。在这篇文章中，我向大家介绍一种基于决策树的机器学习方法来识别Cufflins结果中">
+<meta property="og:type" content="article">
+<meta property="og:title" content="利用决策树来识别Cufflinks中的技术噪音">
+<meta property="og:url" content="http://www.w-zl.com/2015/07/26/利用决策树来识别Cufflinks中的技术噪音.html">
+<meta property="og:site_name" content="- WZL -">
+<meta property="og:description" content="简介熟悉RNA-Seq分析流程的朋友大多都知道，在经典的TopHat-Cufflinks分析流程中，对于最终的转录子（transfrag）组装的结果，很难去判断是否真实存在。在实际操作中，我们一般采用简单的一刀切，来进行过滤。比如，对于FPKM&amp;lt;1的进行过滤。这种方法虽然很有效，但是可能会丢失部分有价值的信息。在这篇文章中，我向大家介绍一种基于决策树的机器学习方法来识别Cufflins结果中">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/decisionTreeSample.png">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/EntropyFunction.png">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/towbit.png">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/mclass.png">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/nclass.png">
+<meta property="og:updated_time" content="2016-06-05T08:54:46.835Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="利用决策树来识别Cufflinks中的技术噪音">
+<meta name="twitter:description" content="简介熟悉RNA-Seq分析流程的朋友大多都知道，在经典的TopHat-Cufflinks分析流程中，对于最终的转录子（transfrag）组装的结果，很难去判断是否真实存在。在实际操作中，我们一般采用简单的一刀切，来进行过滤。比如，对于FPKM&amp;lt;1的进行过滤。这种方法虽然很有效，但是可能会丢失部分有价值的信息。在这篇文章中，我向大家介绍一种基于决策树的机器学习方法来识别Cufflins结果中">
+<meta name="twitter:image" content="http://www.w-zl.com/upload/1/decisionTreeSample.png">
+
+
+
+<script type="text/javascript" id="hexo.configuration">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    scheme: 'Muse',
+    sidebar: {"position":"right","display":"always"},
+    fancybox: true,
+    motion: true,
+    duoshuo: {
+      userId: 0,
+      author: '博主'
+    }
+  };
+</script>
+
+  <title> 利用决策树来识别Cufflinks中的技术噪音 | - WZL - </title>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="zh-Hans">
+
+  
+
+
+
+  <script type="text/javascript">
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?d1a95cd9faed1b055cc5209c77ca132c";
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+  
+  
+    
+  
+
+  <div class="container one-collumn sidebar-position-right page-post-detail ">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-meta ">
+  
+
+  <div class="custom-logo-site-title">
+    <a href="/"  class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <span class="site-title">- WZL -</span>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+  <p class="site-subtitle">自留地</p>
+</div>
+
+<div class="site-nav-toggle">
+  <button>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+    <span class="btn-bar"></span>
+  </button>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-home fa-fw"></i> <br />
+            
+            首页
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-categories">
+          <a href="/categories" rel="section">
+            
+              <i class="menu-item-icon fa fa-th fa-fw"></i> <br />
+            
+            分类
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-tags">
+          <a href="/tags" rel="section">
+            
+              <i class="menu-item-icon fa fa-tags fa-fw"></i> <br />
+            
+            标签
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives" rel="section">
+            
+              <i class="menu-item-icon fa fa-archive fa-fw"></i> <br />
+            
+            归档
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-commonweal">
+          <a href="/404.html" rel="section">
+            
+              <i class="menu-item-icon fa fa-heartbeat fa-fw"></i> <br />
+            
+            公益404
+          </a>
+        </li>
+      
+
+      
+        <li class="menu-item menu-item-search">
+          
+            <a href="#" class="popup-trigger">
+          
+            
+              <i class="menu-item-icon fa fa-search fa-fw"></i> <br />
+            
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  
+
+  
+    <div class="site-search">
+      
+  <div class="popup">
+ <span class="search-icon fa fa-search"></span>
+ <input type="text" id="local-search-input">
+ <div id="local-search-result"></div>
+ <span class="popup-btn-close">close</span>
+</div>
+
+
+    </div>
+  
+</nav>
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal " itemscope itemtype="http://schema.org/Article">
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+            
+            
+              
+                利用决策树来识别Cufflinks中的技术噪音
+              
+            
+          </h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            <span class="post-meta-item-icon">
+              <i class="fa fa-calendar-o"></i>
+            </span>
+            <span class="post-meta-item-text">发表于</span>
+            <time itemprop="dateCreated" datetime="2015-07-26T15:38:48+08:00" content="2015-07-26">
+              2015-07-26
+            </time>
+          </span>
+
+          
+            <span class="post-category" >
+              &nbsp; | &nbsp;
+              <span class="post-meta-item-icon">
+                <i class="fa fa-folder-o"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+              
+                <span itemprop="about" itemscope itemtype="https://schema.org/Thing">
+                  <a href="/categories/机器学习/" itemprop="url" rel="index">
+                    <span itemprop="name">机器学习</span>
+                  </a>
+                </span>
+
+                
+                
+
+              
+            </span>
+          
+
+          
+            
+              <span class="post-comments-count">
+                &nbsp; | &nbsp;
+                <a href="/2015/07/26/利用决策树来识别Cufflinks中的技术噪音.html#comments" itemprop="discussionUrl">
+                  <span class="post-comments-count ds-thread-count" data-thread-key="2015/07/26/利用决策树来识别Cufflinks中的技术噪音.html" itemprop="commentsCount"></span>
+                </a>
+              </span>
+            
+          
+
+          
+
+          
+          
+             <span id="/2015/07/26/利用决策树来识别Cufflinks中的技术噪音.html" class="leancloud_visitors" data-flag-title="利用决策树来识别Cufflinks中的技术噪音">
+               &nbsp; | &nbsp;
+               <span class="post-meta-item-icon">
+                 <i class="fa fa-eye"></i>
+               </span>
+               <span class="post-meta-item-text">阅读次数 </span>
+               <span class="leancloud-visitors-count"></span>
+              </span>
+          
+
+        </div>
+      </header>
+    
+
+
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>熟悉RNA-Seq分析流程的朋友大多都知道，在经典的TopHat-Cufflinks分析流程中，对于最终的转录子（transfrag）组装的结果，很难去判断是否真实存在。在实际操作中，我们一般采用简单的一刀切，来进行过滤。比如，对于FPKM&lt;1的进行过滤。这种方法虽然很有效，但是可能会丢失部分有价值的信息。在这篇文章中，我向大家介绍一种基于决策树的机器学习方法来识别Cufflins结果中的技术噪音（Tech Noise）。</p>
+<h2 id="决策树"><a href="#决策树" class="headerlink" title="决策树"></a>决策树</h2><h3 id="什么是决策树"><a href="#什么是决策树" class="headerlink" title="什么是决策树"></a>什么是决策树</h3><p>决策树是一种依托选择策略建立的图解法。在机器学习中，决策树属于有督导学习（Supervised Learning）中分类（Classification）算法范围。决策树，经常出现在我们生活中。比如，</p>
+<blockquote>
+<p>顾客：这手机能拍照吗？<br>销售：能！<br>顾客：这手机能上网吗？<br>销售：能！<br>顾客：这手机能防水吗？<br>销售：能！<br>顾客：我买了！ </p>
+</blockquote>
+<p>用图解法表示决策过程：<br><img src="/upload/1/decisionTreeSample.png" alt="买手机决策过程图解" title="买手机决策树"><br>这样，有了上面的认识，我们可以发现：</p>
+<ul>
+<li>决策树是一个树结构（可以是二叉树或非二叉树）。</li>
+<li>决策树上的每个非叶节点表示了对某一属性的判断。</li>
+<li>非叶节点的分支表示该属性的判断结果。</li>
+<li>叶节点表示分类结果。</li>
+</ul>
+<h3 id="决策树分类算法"><a href="#决策树分类算法" class="headerlink" title="决策树分类算法"></a>决策树分类算法</h3><p>决策树中最关键步骤是分裂属性。什么是分裂属性？分裂属性是指在某个节点，根据对某个属性的判断来把该节点集合分裂为两个或多个子集合（二叉树或多叉树）。理想的分裂，应该使各个子集合中的各个元素的类别一致。这样一来，分裂属性的情况包括以下三种：</p>
+<ul>
+<li>属性是离散值且不要求生成二叉决策树。此时用属性的每一个划分作为一个分支。</li>
+<li>属性是离散值且要求生成二叉决策树。此时使用属性划分的一个子集进行测试，按照“属于此子集”和“不属于此子集”分成两个分支。</li>
+<li>属性是连续值。此时确定一个值作为分裂点split_point，按照&gt;split_point和&lt;=split_point生成两个分支。  </li>
+</ul>
+<p>这样看来，属性的量度对于决策树的构造非常重要。选择属性度量的算法有很多，大部分都是采用自顶向下递归分治法（Recursive Partitioning），同时采用不回溯的贪心策略（Greedy Strategy）。</p>
+<h4 id="ID3算法"><a href="#ID3算法" class="headerlink" title="ID3算法"></a>ID3算法</h4><p>ID3算法，全称Iterative Dichotomiser 3 ，译名迭代二叉树3代，1986年由Quinlan提出。ID3算法是以信息论为基础，以信息熵和信息增益度为衡量标准，从而实现对数据的归纳分类。即在节点处选择当前集合中最大信息增益的属性作为分裂属性，并在子集中不断递归。以下是信息论中的基本概念：</p>
+<ul>
+<li>信息熵（Entropy）<br>若信源符号有n种取值：$U_1$…$U_i$…$U_n$，对应概率为：$P_1$…$P_i$…$P_n$，且各种符号的出现彼此独立。这时，信源的平均不确定性应当为单个符号不确定性$-logP_i$的统计平均值（$E$），可称为信息熵，即$$H(U)=E\left | -logP_i \right |=\sum_{i=0}^{n}P_ilogP_i$$式中对数一般取2为底，单位为比特。但是，也可以取其它对数底，采用其它相应的单位，它们间可用换底公式换算。 信息熵是表示随机变量不确定性的度量。从直观上，信息熵越大，变量包含的信息量越大，变量的不确定性也越大。一个事物内部会存在随机性，也就是不确定性，而从外部消除这个不确定性唯一的办法是引入信息。如果没有信息，任何公式或者数字的游戏都无法排除不确定性。<br><img src="/upload/1/EntropyFunction.png" alt="信息熵函数" title="信息熵函数"><br><img src="/upload/1/towbit.png" alt="二元信息熵" title="二元信息熵"></li>
+<li>复合熵（Composite Entropy）<br>根据贝叶斯定理，结合信息熵。复合熵函数：$$H(x,y)=E|-logP_{(x,y)}|=\sum_{x}^{ }\sum_{y}^{ }P_{(x,y)}logP_{(x,y)}=\sum_{x}^{ }\sum_{y}^{ }P_xP_ylog(P_xP_y)$$</li>
+<li>条件熵（conditional Entropy）<br>根据贝叶斯定理，结合信息熵。条件熵函数：$$H(X|Y)=E|E|-logP_{(X|Y)}||=\sum_{Y}^{}\sum_{X}^{}P_{Y_j}P_{(X_i|Y_j)}logP_{(X_i|Y_j)}$$</li>
+<li>信息增益（IG，Information Gain）<br>信息增益在信息论中是很有效的特征选择方法。但凡是特征选择，总是将特征的重要程度先进行量化后再进行选择，而如何量化特征的重要性，就成了各种方法最大的不同。在信息增益中，量化特征的重要性就是看特征能够为分类系统带来多少的信息，带来的信息越多，该特征就越为重要。这可以用信息熵去量化。另外需要注意的是，信息增益是针对特征而言，也就是系统中有没有某个特征间系统信息熵的变化。令$A$为分裂特征，$A_i$为A特征分裂子集，$S_n$为n类样本，$U$为所有样本集合，信息增益函数可以表示为：$$IG(A)=H(U)-H(U|A)=\sum_{j=1}^{S}\sum_{i=1}^{A}P_{A_i}P_{S_j|A_i}log(P_{S_j|A_i})-\sum_{j=1}^{S}P_{(S_j)}log(P_{(S_j)})$$</li>
+</ul>
+<p>ID3算法就是利用信息增益来量化特征的重要性。其理论在于，每次分裂实在使系统信息增益最大化的特征上进行。同时ID3只有正负两个样本（全局二叉树），根据信息增益函数，ID3可以表示为：<br>$$Max(IG(A_i))=Max(H(U)-H(U|A))=$$</p>
+<p>$$Max(P_A(P_{(\oplus|A)}logP_{(\oplus|A)}+P_{(\ominus|A)}logP_{(\ominus|A)})+(1-P_A)(P_{(\oplus|A’)}logP_{(\oplus|A’)}+P_{(\ominus|A’)}logP_{(\ominus|A’)})-P_{\oplus}logP_{\oplus}-P_{\ominus}logP_{\ominus})$$<br><strong>实例</strong><br>有类数据如下表，m,n为两个特征，c表示分类。</p>
+<table>
+<thead>
+<tr>
+<th>m</th>
+<th>n</th>
+<th>c</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>+</td>
+<td>+</td>
+<td>+</td>
+</tr>
+<tr>
+<td>+</td>
+<td>+</td>
+<td>+</td>
+</tr>
+<tr>
+<td>+</td>
+<td>-</td>
+<td>+</td>
+</tr>
+<tr>
+<td>-</td>
+<td>+</td>
+<td>-</td>
+</tr>
+<tr>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>+</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<p>根据ID3算法对其建决策树：</p>
+<ol>
+<li>以m特征进行分裂的信息增量。<br>$$IG(m)=H(U)-H(U|A)=-(\frac{1}{2}log_2\frac{1}{2}+\frac{1}{2}log_2\frac{1}{2})-(-\frac{4}{6}(\frac{1}{4}log_2\frac{1}{4}+\frac{3}{4}log_2\frac{3}{4})-\frac{2}{6}(0+0))=0.459$$<br><img src="/upload/1/mclass.png" alt="以m特征分裂" title="以m特征分裂"></li>
+<li>以n特征进行分裂的信息增量。<br>$$IG(n)=H(U)-H(U|A)=-(\frac{1}{2}log_2\frac{1}{2}+\frac{1}{2}log_2\frac{1}{2})-(-\frac{3}{6}(\frac{1}{3}log_2\frac{1}{3}+\frac{2}{3}log_2\frac{2}{3})-\frac{3}{6}(\frac{1}{3}log_2\frac{1}{3}+\frac{2}{3}log_2\frac{2}{3}))=0.082$$<br><img src="/upload/1/nclass.png" alt="以n特征分裂" title="以n特征分裂"></li>
+<li>因为$IG(m)&gt;IG(n)$，选择信息增益最大的特征进行分裂，所以选择m进行分裂。</li>
+</ol>
+<h4 id="C4-5算法"><a href="#C4-5算法" class="headerlink" title="C4.5算法"></a>C4.5算法</h4><p>C4.5算法是ID3算法进行改进算法，主要不同点是对特征重要性量化上采用的是信息增益率（Info Gain Ratio）。这种方法解决ID3算法在某个属性存在大量不同值时导致的过拟合现象。相比于ID3算法，改进有如下几个要点：</p>
+<ul>
+<li>用信息增益率来选择属性。</li>
+<li>在决策树构造过程中可以进行剪枝。ID3算法会由于某些具有很少元素的结点可能会使构造的决策树过适应（Overfitting），这时候不考虑这些结点可能会更好。</li>
+<li>对非离散数据也能处理。</li>
+<li>能够对不完整数据进行处理。<br><strong>信息增益率</strong><br>分裂属性$A$，分裂后子集空间$S$，信息增益率IGR则可表示为：<br>$$IGR(S,A)=\frac{IG(S,A)}{II(S,A)}$$<br>其中II表示内在信息（Intrinsic Information），其定义为：<br>$$II(S,A)=-\sum\frac{|S_i|}{|S|}log_2\frac{|S_i|}{|S|}$$<br>其中$S_i$是属性A分割S而形成的$i$子集。</li>
+</ul>
+<p><strong>实例</strong><br>依旧上述例子</p>
+<ul>
+<li>以m特征进行分裂的信息增量。$$IGR(m)=\frac{IG(m)}{II{m}}=\frac{0.459}{\frac{4}{6}log_2\frac{4}{6}+\frac{2}{6}log_2\frac{2}{6}}=\frac{0.459}{0.918}=0.5$$</li>
+</ul>
+
+      
+    </div>
+    
+    <div>
+      
+        
+      
+    </div>
+
+    <div>
+      
+        
+      
+    </div>
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/RNA-seq/" rel="tag">#RNA-seq</a>
+          
+            <a href="/tags/决策树/" rel="tag">#决策树</a>
+          
+            <a href="/tags/Cufflinks/" rel="tag">#Cufflinks</a>
+          
+            <a href="/tags/技术噪音/" rel="tag">#技术噪音</a>
+          
+        </div>
+      
+
+      
+
+      
+      
+    </footer>
+  </article>
+
+
+
+    <div class="post-spread">
+      
+        <div class="ds-share flat" data-thread-key="2015/07/26/利用决策树来识别Cufflinks中的技术噪音.html"
+     data-title="利用决策树来识别Cufflinks中的技术噪音"
+     data-content=""
+     data-url="http://www.w-zl.com/2015/07/26/利用决策树来识别Cufflinks中的技术噪音.html">
+  <div class="ds-share-inline">
+    <ul  class="ds-share-icons-16">
+
+      <li data-toggle="ds-share-icons-more"><a class="ds-more" href="javascript:void(0);">分享到：</a></li>
+      <li><a class="ds-weibo" href="javascript:void(0);" data-service="weibo">微博</a></li>
+      <li><a class="ds-qzone" href="javascript:void(0);" data-service="qzone">QQ空间</a></li>
+      <li><a class="ds-qqt" href="javascript:void(0);" data-service="qqt">腾讯微博</a></li>
+      <li><a class="ds-wechat" href="javascript:void(0);" data-service="wechat">微信</a></li>
+
+    </ul>
+    <div class="ds-share-icons-more">
+    </div>
+  </div>
+</div>
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+  <div class="comments" id="comments">
+    
+      <div class="ds-thread" data-thread-key="2015/07/26/利用决策树来识别Cufflinks中的技术噪音.html"
+           data-title="利用决策树来识别Cufflinks中的技术噪音" data-url="http://www.w-zl.com/2015/07/26/利用决策树来识别Cufflinks中的技术噪音.html">
+      </div>
+    
+  </div>
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap" >
+            文章目录
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview">
+            站点概览
+          </li>
+        </ul>
+      
+
+      <section class="site-overview sidebar-panel ">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+          <img class="site-author-image" itemprop="image"
+               src="/upload/site/me.jpg"
+               alt="汪自立（Zili Wang）" />
+          <p class="site-author-name" itemprop="name">汪自立（Zili Wang）</p>
+          <p class="site-description motion-element" itemprop="description">this is description</p>
+        </div>
+        <nav class="site-state motion-element">
+          <div class="site-state-item site-state-posts">
+            <a href="/archives">
+              <span class="site-state-item-count">1</span>
+              <span class="site-state-item-name">日志</span>
+            </a>
+          </div>
+
+          
+            <div class="site-state-item site-state-categories">
+              <a href="/categories">
+                <span class="site-state-item-count">1</span>
+                <span class="site-state-item-name">分类</span>
+              </a>
+            </div>
+          
+
+          
+            <div class="site-state-item site-state-tags">
+              <a href="/tags">
+                <span class="site-state-item-count">4</span>
+                <span class="site-state-item-name">标签</span>
+              </a>
+            </div>
+          
+
+        </nav>
+
+        
+
+        <div class="links-of-author motion-element">
+          
+            
+              <span class="links-of-author-item">
+                <a href="https://github.com/iissnan" target="_blank">
+                  
+                    <i class="fa fa-github"></i>
+                  
+                  GitHub
+                </a>
+              </span>
+            
+              <span class="links-of-author-item">
+                <a href="https://www.zhihu.com/people/wang-zi-li-71" target="_blank">
+                  
+                    <i class="fa fa-group"></i>
+                  
+                  知乎
+                </a>
+              </span>
+            
+          
+        </div>
+
+        
+        
+
+        
+        <div class="links-of-blogroll motion-element">
+          
+        </div>
+
+      </section>
+
+      
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+            
+              
+            
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#简介"><span class="nav-number">1.</span> <span class="nav-text">简介</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#决策树"><span class="nav-number">1.1.</span> <span class="nav-text">决策树</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#什么是决策树"><span class="nav-number">1.1.1.</span> <span class="nav-text">什么是决策树</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#决策树分类算法"><span class="nav-number">1.1.2.</span> <span class="nav-text">决策树分类算法</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#ID3算法"><span class="nav-number">1.1.2.1.</span> <span class="nav-text">ID3算法</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#C4-5算法"><span class="nav-number">1.1.2.2.</span> <span class="nav-text">C4.5算法</span></a></li></ol></li></ol></li></ol></li></ol></div>
+            
+          </div>
+        </section>
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright" >
+  
+  &copy;  2015 - 
+  <span itemprop="copyrightYear">2016</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">汪自立（Zili Wang）</span>
+</div>
+
+<div class="powered-by">
+  由 <a class="theme-link" href="http://hexo.io">Hexo</a> 强力驱动
+</div>
+
+<div class="theme-info">
+  主题 -
+  <a class="theme-link" href="https://github.com/iissnan/hexo-theme-next">
+    NexT.Muse
+  </a>
+</div>
+
+
+
+      </div>
+    </footer>
+
+    <div class="back-to-top">
+      <i class="fa fa-arrow-up"></i>
+    </div>
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+  
+  <script type="text/javascript" src="/vendors/jquery/index.js?v=2.1.3"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+
+  
+  <script type="text/javascript" src="/vendors/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/velocity/velocity.ui.min.js?v=1.2.1"></script>
+
+  
+  <script type="text/javascript" src="/vendors/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.0.1"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.0.1"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.0.1"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.0.1"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.0.1"></script>
+
+
+
+  
+
+  
+    
+  
+
+  <script type="text/javascript">
+    var duoshuoQuery = {short_name:"wzl2016"};
+    (function() {
+      var ds = document.createElement('script');
+      ds.type = 'text/javascript';ds.async = true;
+      ds.id = 'duoshuo-script';
+      ds.src = (document.location.protocol == 'https:' ? 'https:' : 'http:') + '//static.duoshuo.com/embed.js';
+      ds.charset = 'UTF-8';
+      (document.getElementsByTagName('head')[0]
+      || document.getElementsByTagName('body')[0]).appendChild(ds);
+    })();
+  </script>
+
+  
+    
+  
+
+
+
+
+
+  
+  
+  <script type="text/javascript">
+    // Popup Window;
+    var isfetched = false;
+    // Search DB path;
+    var search_path = "search.xml";
+    if (search_path.length == 0) {
+       search_path = "search.xml";
+    }
+    var path = "/" + search_path;
+    // monitor main search box;
+
+    function proceedsearch() {
+      $("body").append('<div class="popoverlay">').css('overflow', 'hidden');
+      $('.popup').toggle();
+
+    }
+    // search function;
+    var searchFunc = function(path, search_id, content_id) {
+    'use strict';
+    $.ajax({
+        url: path,
+        dataType: "xml",
+        async: true,
+        success: function( xmlResponse ) {
+            // get the contents from search data
+            isfetched = true;
+            $('.popup').detach().appendTo('.header-inner');
+            var datas = $( "entry", xmlResponse ).map(function() {
+                return {
+                    title: $( "title", this ).text(),
+                    content: $("content",this).text(),
+                    url: $( "url" , this).text()
+                };
+            }).get();
+            var $input = document.getElementById(search_id);
+            var $resultContent = document.getElementById(content_id);
+            $input.addEventListener('input', function(){
+                var matchcounts = 0;
+                var str='<ul class=\"search-result-list\">';                
+                var keywords = this.value.trim().toLowerCase().split(/[\s\-]+/);
+                $resultContent.innerHTML = "";
+                if (this.value.trim().length > 1) {
+                // perform local searching
+                datas.forEach(function(data) {
+                    var isMatch = true;
+                    var content_index = [];
+                    var data_title = data.title.trim().toLowerCase();
+                    var data_content = data.content.trim().replace(/<[^>]+>/g,"").toLowerCase();
+                    var data_url = data.url;
+                    var index_title = -1;
+                    var index_content = -1;
+                    var first_occur = -1;
+                    // only match artiles with not empty titles and contents
+                    if(data_title != '' && data_content != '') {
+                        keywords.forEach(function(keyword, i) {
+                            index_title = data_title.indexOf(keyword);
+                            index_content = data_content.indexOf(keyword);
+                            if( index_title < 0 && index_content < 0 ){
+                                isMatch = false;
+                            } else {
+                                if (index_content < 0) {
+                                    index_content = 0;
+                                }
+                                if (i == 0) {
+                                    first_occur = index_content;
+                                }
+                            }
+                        });
+                    }
+                    // show search results
+                    if (isMatch) {
+                        matchcounts += 1;
+                        str += "<li><a href='"+ data_url +"' class='search-result-title'>"+ data_title +"</a>";
+                        var content = data.content.trim().replace(/<[^>]+>/g,"");
+                        if (first_occur >= 0) {
+                            // cut out 100 characters
+                            var start = first_occur - 20;
+                            var end = first_occur + 80;
+                            if(start < 0){
+                                start = 0;
+                            }
+                            if(start == 0){
+                                end = 50;
+                            }
+                            if(end > content.length){
+                                end = content.length;
+                            }
+                            var match_content = content.substring(start, end);
+                            // highlight all keywords
+                            keywords.forEach(function(keyword){
+                                var regS = new RegExp(keyword, "gi");
+                                match_content = match_content.replace(regS, "<b class=\"search-keyword\">"+keyword+"</b>");
+                            });
+                            
+                            str += "<p class=\"search-result\">" + match_content +"...</p>"
+                        }
+                        str += "</li>";
+                    }
+                })};
+                str += "</ul>";
+                if (matchcounts == 0) { str = '<div id="no-result"><i class="fa fa-frown-o fa-5x" /></div>' }
+                if (keywords == "") { str = '<div id="no-result"><i class="fa fa-search fa-5x" /></div>' }
+                $resultContent.innerHTML = str;
+            });
+            proceedsearch();
+        }
+    });}
+
+    // handle and trigger popup window;
+    $('.popup-trigger').mousedown(function(e) {
+      e.stopPropagation();
+      if (isfetched == false) {
+        searchFunc(path, 'local-search-input', 'local-search-result');
+      } else {
+        proceedsearch();
+      };
+
+    });
+
+    $('.popup-btn-close').click(function(e){
+      $('.popup').hide();
+      $(".popoverlay").remove();
+      $('body').css('overflow', '');
+    });
+    $('.popup').click(function(e){
+      e.stopPropagation();
+    });
+  </script>
+
+  
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Config({
+      tex2jax: {
+        inlineMath: [ ['$','$'], ["\\(","\\)"]  ],
+        processEscapes: true,
+        skipTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    });
+  </script>
+
+  <script type="text/x-mathjax-config">
+    MathJax.Hub.Queue(function() {
+      var all = MathJax.Hub.getAllJax(), i;
+      for (i=0; i < all.length; i += 1) {
+        all[i].SourceElement().parentNode.className += ' has-jax';
+      }
+    });
+  </script>
+  <script type="text/javascript" src="//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+
+  
+
+  
+  <script src="https://cdn1.lncld.net/static/js/av-core-mini-0.6.1.js"></script>
+  <script>AV.initialize("I0A2HMXFnUACf0hwFKgONB3L-gzGzoHsz", "WmVMLrx6PpznQhqNLYfvE6Wl");</script>
+  <script>
+    function showTime(Counter) {
+      var query = new AV.Query(Counter);
+      var entries = [];
+      var $visitors = $(".leancloud_visitors");
+
+      $visitors.each(function () {
+        entries.push( $(this).attr("id").trim() );
+      });
+
+      query.containedIn('url', entries);
+      query.find()
+        .done(function (results) {
+          var COUNT_CONTAINER_REF = '.leancloud-visitors-count';
+
+          if (results.length === 0) {
+            $visitors.find(COUNT_CONTAINER_REF).text(0);
+            return;
+          }
+
+          for (var i = 0; i < results.length; i++) {
+            var item = results[i];
+            var url = item.get('url');
+            var time = item.get('time');
+            var element = document.getElementById(url);
+
+            $(element).find(COUNT_CONTAINER_REF).text(time);
+          }
+        })
+        .fail(function (object, error) {
+          console.log("Error: " + error.code + " " + error.message);
+        });
+    }
+
+    function addCount(Counter) {
+      var $visitors = $(".leancloud_visitors");
+      var url = $visitors.attr('id').trim();
+      var title = $visitors.attr('data-flag-title').trim();
+      var query = new AV.Query(Counter);
+
+      query.equalTo("url", url);
+      query.find({
+        success: function(results) {
+          if (results.length > 0) {
+            var counter = results[0];
+            counter.fetchWhenSave(true);
+            counter.increment("time");
+            counter.save(null, {
+              success: function(counter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(counter.get('time'));
+              },
+              error: function(counter, error) {
+                console.log('Failed to save Visitor num, with error message: ' + error.message);
+              }
+            });
+          } else {
+            var newcounter = new Counter();
+            newcounter.set("title", title);
+            newcounter.set("url", url);
+            newcounter.set("time", 1);
+            newcounter.save(null, {
+              success: function(newcounter) {
+                var $element = $(document.getElementById(url));
+                $element.find('.leancloud-visitors-count').text(newcounter.get('time'));
+              },
+              error: function(newcounter, error) {
+                console.log('Failed to create');
+              }
+            });
+          }
+        },
+        error: function(error) {
+          console.log('Error:' + error.code + " " + error.message);
+        }
+      });
+    }
+
+    $(function() {
+      var Counter = AV.Object.extend("Counter");
+      if ($('.leancloud_visitors').length == 1) {
+        addCount(Counter);
+      } else if ($('.post-title-link').length > 1) {
+        showTime(Counter);
+      }
+    });
+  </script>
+
+
+
+  
+<script type="text/javascript" async src="//push.zhanzhang.baidu.com/push.js">
+</script>
+
+
+</body>
+</html>
