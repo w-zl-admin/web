@@ -27,13 +27,14 @@
 <p>这样看来，属性的量度对于决策树的构造非常重要。选择属性度量的算法有很多，大部分都是采用自顶向下递归分治法（Recursive Partitioning），同时采用不回溯的贪心策略（Greedy Strategy）。</p>
 <h4 id="ID3算法"><a href="#ID3算法" class="headerlink" title="ID3算法"></a>ID3算法</h4><p>ID3算法，全称Iterative Dichotomiser 3 ，译名迭代二叉树3代，1986年由Quinlan提出。ID3算法是以信息论为基础，以信息熵和信息增益度为衡量标准，从而实现对数据的归纳分类。即在节点处选择当前集合中最大信息增益的属性作为分裂属性，并在子集中不断递归。以下是信息论中的基本概念：</p>
 <ul>
-<li>信息熵（Entropy）<br>若信源符号有n种取值：$U_1$…$U_i$…$U_n$，对应概率为：$P_1$…$P_i$…$P_n$，且各种符号的出现彼此独立。这时，信源的平均不确定性应当为单个符号不确定性$-logP_i$的统计平均值（$E$），可称为信息熵，即$$H(U)=E\left | -logP_i \right |=\sum_{i=0}^{n}P_ilogP_i$$式中对数一般取2为底，单位为比特。但是，也可以取其它对数底，采用其它相应的单位，它们间可用换底公式换算。 信息熵是表示随机变量不确定性的度量。从直观上，信息熵越大，变量包含的信息量越大，变量的不确定性也越大。一个事物内部会存在随机性，也就是不确定性，而从外部消除这个不确定性唯一的办法是引入信息。如果没有信息，任何公式或者数字的游戏都无法排除不确定性。<br><img src="/upload/1/EntropyFunction.png" alt="信息熵函数" title="信息熵函数"><br><img src="/upload/1/towbit.png" alt="二元信息熵" title="二元信息熵"></li>
-<li>复合熵（Composite Entropy）<br>根据贝叶斯定理，结合信息熵。复合熵函数：$$H(x,y)=E|-logP_{(x,y)}|=\sum_{x}^{ }\sum_{y}^{ }P_{(x,y)}logP_{(x,y)}=\sum_{x}^{ }\sum_{y}^{ }P_xP_ylog(P_xP_y)$$</li>
-<li>条件熵（conditional Entropy）<br>根据贝叶斯定理，结合信息熵。条件熵函数：$$H(X|Y)=E|E|-logP_{(X|Y)}||=\sum_{Y}^{}\sum_{X}^{}P_{Y_j}P_{(X_i|Y_j)}logP_{(X_i|Y_j)}$$</li>
+<li>信息熵（Entropy）<br>若信源符号有n种取值：$U_1$…$U_i$…$U_n$，对应概率为：$P_1$…$P_i$…$P_n$，且各种符号的出现彼此独立。这时，信源的平均不确定性应当为单个符号不确定性$-logP_i$的统计平均值（$E$），可称为信息熵，即$$H(U)=E\left | -logP_i \right |=-\sum_{i=0}^{n}P_ilogP_i$$式中对数一般取2为底，单位为比特。但是，也可以取其它对数底，采用其它相应的单位，它们间可用换底公式换算。 信息熵是表示随机变量不确定性的度量。从直观上，信息熵越大，变量包含的信息量越大，变量的不确定性也越大。一个事物内部会存在随机性，也就是不确定性，而从外部消除这个不确定性唯一的办法是引入信息。如果没有信息，任何公式或者数字的游戏都无法排除不确定性。<br><img src="/upload/1/EntropyFunction.png" alt="信息熵函数" title="信息熵函数"><br><img src="/upload/1/towbit.png" alt="二元信息熵" title="二元信息熵"></li>
+<li>复合熵（Composite Entropy）<br>根据贝叶斯定理，结合信息熵。复合熵函数：$$H(x,y)=E|-logP_{(x,y)}|=\sum_{x}^{ }\sum_{y}^{ }P_{(x,y)}logP_{(x,y)}=-\sum_{x}^{ }\sum_{y}^{ }P_xP_ylog(P_xP_y)$$</li>
+<li>条件熵（conditional Entropy）<br>根据贝叶斯定理，结合信息熵。条件熵函数：$$H(X|Y)=E|E|-logP_{(X|Y)}||=-\sum_{Y}^{}\sum_{X}^{}P_{Y_j}P_{(X_i|Y_j)}logP_{(X_i|Y_j)}$$</li>
 <li>信息增益（IG，Information Gain）<br>信息增益在信息论中是很有效的特征选择方法。但凡是特征选择，总是将特征的重要程度先进行量化后再进行选择，而如何量化特征的重要性，就成了各种方法最大的不同。在信息增益中，量化特征的重要性就是看特征能够为分类系统带来多少的信息，带来的信息越多，该特征就越为重要。这可以用信息熵去量化。另外需要注意的是，信息增益是针对特征而言，也就是系统中有没有某个特征间系统信息熵的变化。令$A$为分裂特征，$A_i$为A特征分裂子集，$S_n$为n类样本，$U$为所有样本集合，信息增益函数可以表示为：$$IG(A)=H(U)-H(U|A)=\sum_{j=1}^{S}\sum_{i=1}^{A}P_{A_i}P_{S_j|A_i}log(P_{S_j|A_i})-\sum_{j=1}^{S}P_{(S_j)}log(P_{(S_j)})$$</li>
 </ul>
-<p>ID3算法就是利用信息增益来量化特征的重要性。其理论在于，每次分裂实在使系统信息增益最大化的特征上进行。同时ID3只有正负两个样本（全局二叉树），根据信息增益函数，ID3可以表示为：<br>$$Max(IG(A_i))=Max(H(U)-H(U|A))=$$</p>
-<p>$$Max(P_A(P_{(\oplus|A)}logP_{(\oplus|A)}+P_{(\ominus|A)}logP_{(\ominus|A)})+(1-P_A)(P_{(\oplus|A’)}logP_{(\oplus|A’)}+P_{(\ominus|A’)}logP_{(\ominus|A’)})-P_{\oplus}logP_{\oplus}-P_{\ominus}logP_{\ominus})$$<br><strong>实例</strong><br>有类数据如下表，m,n为两个特征，c表示分类。</p>
+<p>ID3算法就是利用信息增益来量化特征的重要性。其理论在于，每次分裂实在使系统信息增益最大化的特征上进行。同时ID3只有正负两个样本（全局二叉树），根据信息增益函数，ID3可以表示为：<br>$$\max_{i}(IG(A_i))=\max_{i}(H(U)-H(U|A))=$$</p>
+<p>$$\max_{i}(P_A(P_{(\oplus|A)}logP_{(\oplus|A)}+P_{(\ominus|A)}logP_{(\ominus|A)})+(1-P_A)(P_{(\oplus|C_SA)}logP_{(\oplus|C_SA)}+P_{(\ominus|C_SA)}logP_{(\ominus|C_SA)})-P_{\oplus}logP_{\oplus}-P_{\ominus}logP_{\ominus})$$</p>
+<h5 id="实例"><a href="#实例" class="headerlink" title="实例"></a>实例</h5><p>有类数据如下表，m,n为两个特征，c表示分类。</p>
 <table>
 <thead>
 <tr>
@@ -86,13 +87,48 @@
 <li>用信息增益率来选择属性。</li>
 <li>在决策树构造过程中可以进行剪枝。ID3算法会由于某些具有很少元素的结点可能会使构造的决策树过适应（Overfitting），这时候不考虑这些结点可能会更好。</li>
 <li>对非离散数据也能处理。</li>
-<li>能够对不完整数据进行处理。<br><strong>信息增益率</strong><br>分裂属性$A$，分裂后子集空间$S$，信息增益率IGR则可表示为：<br>$$IGR(S,A)=\frac{IG(S,A)}{II(S,A)}$$<br>其中II表示内在信息（Intrinsic Information），其定义为：<br>$$II(S,A)=-\sum\frac{|S_i|}{|S|}log_2\frac{|S_i|}{|S|}$$<br>其中$S_i$是属性A分割S而形成的$i$子集。</li>
+<li>能够对不完整数据进行处理。</li>
 </ul>
-<p><strong>实例</strong><br>依旧上述例子</p>
+<h5 id="信息增益率"><a href="#信息增益率" class="headerlink" title="信息增益率"></a>信息增益率</h5><p>分裂属性$A$，分裂后子集空间$S$，信息增益率IGR则可表示为：<br>$$IGR(S,A)=\frac{IG(S,A)}{II(S,A)}$$<br>其中II表示内在信息（Intrinsic Information），其定义为：<br>$$II(S,A)=-\sum\frac{|S_i|}{|S|}log_2\frac{|S_i|}{|S|}$$<br>其中$S_i$是属性A分割S而形成的$i$子集。</p>
+<h5 id="实例-1"><a href="#实例-1" class="headerlink" title="实例"></a>实例</h5><p>依旧上述例子</p>
 <ul>
 <li>以m特征进行分裂的信息增量。$$IGR(m)=\frac{IG(m)}{II{m}}=\frac{0.459}{\frac{4}{6}log_2\frac{4}{6}+\frac{2}{6}log_2\frac{2}{6}}=\frac{0.459}{0.918}=0.5$$</li>
 </ul>
-]]></content>
+<h4 id="CART算法"><a href="#CART算法" class="headerlink" title="CART算法"></a>CART算法</h4><p>分类和回归树（Classification and regression tree，CART）在模式分类中被视作一种通用的树生长算法。CART提供一种通用框架，利用它，可以实例化各种各样不同的判定树。按照CART，有6个问题需要回答：</p>
+<ul>
+<li>节点分支数应该是多少？</li>
+<li>节点测试是哪个属性？</li>
+<li>何时可以令某节点成为叶节点？</li>
+<li>如何剪枝？</li>
+<li>如果叶节点仍不“纯”，那么怎样给它赋类别标记？</li>
+<li>缺省数据处理？</li>
+</ul>
+<h5 id="分支数目"><a href="#分支数目" class="headerlink" title="分支数目"></a>分支数目</h5><p>任意多类别样本都可以通过多个二叉树进行划分。所以，二叉树具有万能的表达能力，并且在训练上很简便。所以，CART一般采用二叉树结构。</p>
+<h5 id="节点不纯度"><a href="#节点不纯度" class="headerlink" title="节点不纯度"></a>节点不纯度</h5><p>CART中有四种方式来量化不纯度（Impurity）：</p>
+<ul>
+<li>信息熵不纯度（Entropy Impurity）$$I(N)=-sum_{j}^{}P(w_j)log_2P(w_j)$$</li>
+<li>方差不纯度(Variance Impurity) $$I(N)=\prod_{j}P(w_j)=P(1-P)$$</li>
+<li>Gini不纯度(Gini Impurity)$$I(N)=\sum_{j}^{}P(w_j)P(w_{C_{S}j})=1-\sum_{j}^{}P^2(w_j)$$</li>
+<li>误分类不纯度(Missclassification Impurity)$$I(N)=1-\max_{j}P(w_j)$$<br><img src="/upload/1/class.png" alt="4种不纯度量化方法" title="4种不纯度量化方法"></li>
+</ul>
+<p>在如何选择分裂属性上，很明显的启发思路是选择使不纯度下降最快的那个属性（ID3算法）。可记作$$\max_{i}{\Delta}I(N)=I(N)-P_LI(N_L)-(1-P_L)I(N_R)$$，其中$N_L$和$N_R$分别是左右子节点。这种贪心算法有个缺点，就是无法确保顺序局部优化过程能得到全局最优。实践中，熵不纯度和Gini不纯度运用广泛，但在实践过程中，不同的不纯度函数对最后的分类效果和其性能影响往往比预期的小。所以，在实践中，反倒是停止判决和剪枝算法受到更多的重视。</p>
+<h5 id="分支停止准则"><a href="#分支停止准则" class="headerlink" title="分支停止准则"></a>分支停止准则</h5><p>二叉树，分支训练中，分支过多会过拟合，分支过少，训练样本误差大，分类效果也差。究竟何时应该停止分支呢？这里介绍五种方法：</p>
+<ol>
+<li>验证和交叉验证技术（validation and cross-validation）。<br>将部分样本用于训练树，剩余样本作为验证。持续节点分支，直到对于验证集的分类误差最小化。</li>
+<li>不纯度下降门限。<br>预先设定一个不纯度下降差的（小）门限值，当候选分支小于这个值时，停止分支。这种方法有两个优点，一是全部样本均用于训练，二是树的每层都可能存在叶节点。但该方法也有个固有缺点，即门限值预先设定相当困难，因为最终性能与门限大小并无直接的函数关系</li>
+<li>节点最小样本数。<br>当候选分支样本数小于设定值，停止分支。这种方法类似k-近临分类器，当样本集中时，分割子集就小；当样本稀疏时，分割子集就大。</li>
+<li>高复杂度换取高的准确度。<br>通过最小化全局指标：$$\alpha{\cdot}size+\sum_{叶节点}^{}I(N)$$这里$size$表示节点或分支的数目，$\alpha$是个正常数（类似神经网络中的正则化方法）。这种方法中，$\alpha$的设定也很难，它也与最终分类性能无简单的相关关系。</li>
+<li>不纯度下降的显著性检验。<br>估计之前的所有${\Delta}I(N)$概率分布，在对某一候选分支$i$时，检验${\Delta}I(N_i)$是否与上述分布存在统计学差异。<br><img src="/upload/1/chisq.png" alt="卡方检验" title="采取卡方检验。对于候选分支，其理论发生概率$p$对应得卡方值函数为$\frac{(1-p)^2}{p}$，在0.05的置信水平下，$p$应该大于0.18。"></li>
+<li>$\chi^2$假设检验。<br>要点是判断候选分支是否存在统计学上的意义，也就是判断分支是否明显有别于随机分支。假设节点存在$n$个样本（$n_1$个$w_1$类，$n_2$个$w_2$类），候选分支将$Pn$个样本分到左分支，$(1-P)n$分到了右支。此时假设是随机分支，左枝应该有$Pn_1$个$w_1$和$Pn_2$个$w_2$，其它剩余的都在右支。如果用$\chi^2$来评估这次分支与随机的偏离度，那偏离度$$\chi^2=\sum_{i=1}^{2}\frac{(n_{iL}-n_{ie})^2}{n_{ie}}$$其中$n_{iL}$是指$w_i$在左分支的数目，而$n_{ie}=Pn_i$则对应随机分支情况下的值。当两者相同时，$\chi^2$接近0，相反，当$\chi^2$越大，说明两者差异越大。当其大于某临界值时，就可以拒绝零假设（候选分支等于随机分支）。</li>
+</ol>
+<h5 id="剪枝"><a href="#剪枝" class="headerlink" title="剪枝"></a>剪枝</h5><p>有时，分支停止方法会因缺少足够的前瞻性而过早停止（视界局限效应）。这时，需要剪枝（pruning）来克服这种缺陷。在剪枝过程中，树首先要充足生长，直到叶节点都有最小不纯度值为止，因而没有任何推定的“视界局限”。然后，对所有相邻的成对叶节点，考虑能否合并它们，如果合并它们只引起很小的不纯度增长，那就合并它们为新的叶节点。</p>
+<h2 id="cufflinks中决策树的理论基础"><a href="#cufflinks中决策树的理论基础" class="headerlink" title="cufflinks中决策树的理论基础"></a>cufflinks中决策树的理论基础</h2><p>cufflinks软件原理是将mapped reads组装成transfrag，由于reads很短，拼接还原难度高。这个过程中可能会产生错误的结果。我们假设：</p>
+<ol>
+<li>同一染色体上的基因的特征相似。</li>
+<li>cufflinks产生的未知的transfrag大部分是noise，可靠的transfrag仅占小部分。<br>这样，我们就拥有了一个正样本集（真实基因），和一个负样本集（noise），这就可以建立决策树，来确认真实基因的特征。<br>在算法上，采取常用的CART算法，软件选用R语言及其rpart模块。</li>
+</ol>
+<h1 id="数据"><a href="#数据" class="headerlink" title="数据"></a>数据</h1><h2 id="数据来源"><a href="#数据来源" class="headerlink" title="数据来源"></a>数据来源</h2><h2 id="特征选择"><a href="#特征选择" class="headerlink" title="特征选择"></a>特征选择</h2><h1 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h1><p>一步一步</p>
+<h1 id="验证"><a href="#验证" class="headerlink" title="验证"></a>验证</h1>]]></content>
     </entry>
     
   
