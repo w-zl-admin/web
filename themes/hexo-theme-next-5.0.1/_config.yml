@@ -30,7 +30,7 @@ menu:
   tags: /tags
   archives: /archives
 #  about: /about
-#  commonweal: /404.html
+  commonweal: /404.html
 
 
 # Enable/Disable menu icons.
@@ -212,7 +212,7 @@ auto_excerpt:
 
 
 # Wechat Subscriber
-# wechat_subscriber:
+#wechat_subscriber:
 #  enabled: true
 #  qcode: /upload/site/me.jpg
 #  description: ex. subscribe to my blog by scanning my public wechat account
