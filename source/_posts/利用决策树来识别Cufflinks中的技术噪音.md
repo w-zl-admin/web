@@ -132,6 +132,8 @@ CART中有四种方式来量化不纯度（Impurity）：
 ![卡方检验](/upload/1/chisq.png '采取卡方检验。对于候选分支，其理论发生概率$p$对应得卡方值函数为$\frac{(1-p)^2}{p}$，在0.05的置信水平下，$p$应该大于0.18。')
 6. $\chi^2$假设检验。
 要点是判断候选分支是否存在统计学上的意义，也就是判断分支是否明显有别于随机分支。假设节点存在$n$个样本（$n\_1$个$w\_1$类，$n\_2$个$w\_2$类），候选分支将$Pn$个样本分到左分支，$(1-P)n$分到了右支。此时假设是随机分支，左枝应该有$Pn\_1$个$w\_1$和$Pn\_2$个$w\_2$，其它剩余的都在右支。如果用$\chi^2$来评估这次分支与随机的偏离度，那偏离度$$\chi^2=\sum\_{i=1}^{2}\frac{(n\_{iL}-n\_{ie})^2}{n\_{ie}}$$其中$n\_{iL}$是指$w\_i$在左分支的数目，而$n\_{ie}=Pn\_i$则对应随机分支情况下的值。当两者相同时，$\chi^2$接近0，相反，当$\chi^2$越大，说明两者差异越大。当其大于某临界值时，就可以拒绝零假设（候选分支等于随机分支）。
+7. 损失矩阵
+构建损失矩阵，根据损失矩阵计算节点损失，当叶节点的损失大于其父节点的损失时，则停止分支。
 
 ##### 剪枝
 有时，分支停止方法会因缺少足够的前瞻性而过早停止（视界局限效应）。这时，需要剪枝（pruning）来克服这种缺陷。在剪枝过程中，树首先要充足生长，直到叶节点都有最小不纯度值为止，因而没有任何推定的“视界局限”。然后，对所有相邻的成对叶节点，考虑能否合并它们，如果合并它们只引起很小的不纯度增长，那就合并它们为新的叶节点。
@@ -139,14 +141,105 @@ CART中有四种方式来量化不纯度（Impurity）：
 ## cufflinks中决策树的理论基础
 cufflinks软件原理是将mapped reads组装成transfrag，由于reads很短，拼接还原难度高。这个过程中可能会产生错误的结果。我们假设：
 1. 同一染色体上的基因的特征相似。
-2. cufflinks产生的未知的transfrag大部分是noise，可靠的transfrag仅占小部分。
+2. cufflinks产生的未知的transfrag大部分是noise，可靠的transfrag仅占小部分，这些可靠的transfrag拥有与正常基因相似的特征，且与noise存在较大差异。
 这样，我们就拥有了一个正样本集（真实基因），和一个负样本集（noise），这就可以建立决策树，来确认真实基因的特征。
 在算法上，采取常用的CART算法，软件选用R语言及其rpart模块。
 
-# 数据
-## 数据来源
 ## 特征选择
-# 分析
-一步一步
-# 验证
+该次选取了个5特征变量：长度，外显子数目，样本中表达比例，FPKM值。
 
+|特征变量|选择原因|
+|--------|----------------|
+|  长度  | 人类基因90%以上都在300bp以上，过短的transfrag可能是由于技术噪音产生 |
+| 外显子数 | 人类大部分基因都拥有多个外显子数，趋于更为复杂的结构；而技术噪音一般都很简单。|
+| 样本中表达比例 | 正常的基因，应该会在多个样本中都会出现表达，而部分技术噪音可能仅在个别样本中表达。 |
+| FPKM值 | 正常基因的FPKM值应该会在一定范围内，而技术噪音序列可能会存在FPKM极值。 |
+
+
+# 数据建模
+## 数据描述
+数据使用的是10个人类样本cufflinks组装结果中1号染色体上的数据。
+数据集中共28,290个转录子，其中26,185是已知转录位点，2,105是未知转录位点。
+
+|特征变量|最小值|中值|均值|最大值|
+|------|-----|-----|-----|-------|
+| 长度 | 1 | 1540 | 2679 | 79680 |
+| 外显子数 | 1 | 5 | 7.887 | 100 |
+| 表达比例 | 0.10 | 0.50 | 0.54 | 1.00 |
+| FPKM | 0 | 0.115 | 2.131 | 5271 |
+
+
+![数据描述](/upload/1/summary.png '数据描述(已知转录和未知转录并不能明显区分开)')
+![PCA分析](/upload/1/pca_before.png 'PCA结果（无法区分）')
+## rpart包参数简介
+```
+函数：rpart
+用法：rpart(formula, data, weights, subset, na.action = na.rpart, method, model = FALSE, x = FALSE, y = TRUE, parms, control, cost, ...)
+参数：
+	formula：公式，例Y~X1+X2+X3+X4
+	data：数据源，一般是数据框
+	weights: 向量，各个自变量的权重
+	subset：只用特定列
+	method：如果Y是生存类，选择"exp"；如果Y有两列，则选择"poisson"；如果Y是因子，则选择"class"；如果Y是连续变量,则选择"anova";
+	parms：分裂参数；"anova"类没有该参数，"exp"和"poisson"仅有先验分布；"class"有三项，prior对先验概率，loss对损失矩阵，split对不纯度计算方式———"gini"或"information"。
+	control：参见rpart.control
+	cost：各自变量代价列表
+函数：rpart.control
+用法：rpart.control(minsplit = 20, minbucket = round(minsplit/3), cp = 0.01, maxcompete = 4, maxsurrogate = 5, usesurrogate = 2, xval = 10, surrogatestyle = 0, maxdepth = 30, ...)
+参数：
+	minsplit：父节点最小样本数。
+	minbucket：叶节点最小样本数。
+	cp：complexity parameter.复杂性参数。分支后cp必须高于设定值。
+	maxcompete：保留的最大候选分支数。
+	maxsurrogate：替代分裂最大数。
+	usesurrogate：替代分裂处理。0，仅展示；1，使用替代分裂；2，不使用替代分裂
+	xval：cv数
+	surrogatestyle：替代分裂风格。0，数值；1，比例。
+	maxdepth：树的最大深度
+```
+## 代码
+```R
+# 加载rpart包
+library(rpart)
+# 构建数据框
+d <- data.frame(length,exon,ratio,FPKM,class)
+# 训练集和测试集
+train.l <- sample(1:dim(d)[1],as.integer(dim(d)[1]*0.7)) #取样列
+train <- d[train.l,] #训练集
+test <- d[-train.l,] #测试集
+# rpart控制参数设置
+ct <- rpart.control(xval=10, minsplit=100, minbucket=40, maxdepth=4) #采用10折交叉验证；停止分裂条件：1、父节点样本小于100；2、叶节点样本大于40；3、深度小于4层；
+# rpart建模
+fit<-rpart(class~length+exon+rat+FPKM,train,method='class',control=ct,parms = list(split = "information"))
+# 可视化
+plot(fit,margin=0.1)
+text(fit,use.n=T) #原始树
+# 剪枝
+plotcp(fit)  #筛选合适的cp值
+plot(prune(fit,cp=0.01),margin=0.1) 
+text(prune(fit,cp=0.01),use.n=T) #length过拟合，增大cp值，减少
+plot(prune(fit,cp=0.045),margin=0.1)
+text(prune(fit,cp=0.045),use.n=T) 
+# 确定模型
+fit.used<-prune(fit,cp=0.045)
+# 精度
+summary(test$type == predict(fit.used,test,type='class'))  #统计预测结果与实际结果是否相同
+summary(test$type[test$type != predict(fit.used,test,type='class')]) #统计预测结果与实际一致
+summary(test$type[test$type == predict(fit.used,test,type='class')]) #统计预测结果与实际不一致
+```
+![原始树](/upload/1/raw_tree.png '原始树')
+![第一次剪枝](/upload/1/pruned_tree1.png '0.01cp值剪枝结果，过拟合严重。（默认cp值为0.01，所以与原始树一致）')
+![第二次剪枝](/upload/1/pruned_tree2.png '最终模型，0.045cp值剪枝结果，主要依靠exon和length属性进行分类')
+## 模型分析
+![2x2列联表](/upload/1/2x2ContingencyTable.png '2x2列联表')
+敏感度$TPR$:
+$$TPR=\frac{7546}{7546+332}=0.9578573$$
+精度$PPV$:
+$$PPV=\frac{7546}{179+7546}=0.9768285$$
+特异性$SPC$:
+$$SPC=\frac{430}{430+332}=0.5643045$$
+准确度$ACC$:
+$$ACC=\frac{430+7546}{430+179+332+7546}=0.9397903$$
+从上述四个指标上看，除了特异性差很多，其他指标都表现良好。考虑到unknown中有潜在的基因，特异性差也是在预料当中。
+# 结论
+相对之前的经验判断，该方法使用了CART算法构建背景噪音过滤决策树，科学量化了过滤条件。
