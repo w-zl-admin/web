@@ -231,6 +231,7 @@ summary(test$type[test$type == predict(fit.used,test,type='class')]) #统计预�
 ![第一次剪枝](/upload/1/pruned_tree1.png '0.01cp值剪枝结果，过拟合严重。（默认cp值为0.01，所以与原始树一致）')
 ![第二次剪枝](/upload/1/pruned_tree2.png '最终模型，0.045cp值剪枝结果，主要依靠exon和length属性进行分类')
 ## 模型分析
+最终的模型，只用到了两个属性。这个和之前数据描述相符（长度和外显子数勉强可以区分，表达比例和FPKM重叠严重）。将模型用于测试数据集，模型表现：
 ![2x2列联表](/upload/1/2x2ContingencyTable.png '2x2列联表')
 敏感度$TPR$:
 $$TPR=\frac{7546}{7546+332}=0.9578573$$
@@ -241,5 +242,12 @@ $$SPC=\frac{430}{430+332}=0.5643045$$
 准确度$ACC$:
 $$ACC=\frac{430+7546}{430+179+332+7546}=0.9397903$$
 从上述四个指标上看，除了特异性差很多，其他指标都表现良好。考虑到unknown中有潜在的基因，特异性差也是在预料当中。
+在将该模型用于原始数据中unknown部分再进行重新分类，2105个unknown数据中预测出641个潜在的基因，再进一步对模型分类后的数据进行描述：
+![预测后数据描述](/upload/1/summary1.png '预测后数据描述')
+可以看出，预测后基因与技术噪音在长度和外显子数这两个属性区别更加明显。
 # 结论
-相对之前的经验判断，该方法使用了CART算法构建背景噪音过滤决策树，科学量化了过滤条件。
+相对之前的经验判断，使用了CART算法构建技术噪音过滤决策树，避免了主观判断，科学量化了过滤条件。
+# 参考文献
+1. Duda R O, Hart P E, Stork D G. Pattern classification[M]. John Wiley & Sons, 2012.
+2. Prensner J R, Iyer M K, Balbin O A, et al. Transcriptome sequencing across a prostate cancer cohort identifies PCAT-1, an unannotated lincRNA implicated in disease progression[J]. Nature biotechnology, 2011, 29(8): 742-749.
+3. Harrington P. 机器学习实战[J]. 人民邮电出版社, 北京, 2013.
