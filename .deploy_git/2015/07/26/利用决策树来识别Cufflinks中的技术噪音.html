@@ -93,7 +93,14 @@
 <meta property="og:image" content="http://www.w-zl.com/upload/1/nclass.png">
 <meta property="og:image" content="http://www.w-zl.com/upload/1/class.png">
 <meta property="og:image" content="http://www.w-zl.com/upload/1/chisq.png">
-<meta property="og:updated_time" content="2016-06-06T11:03:16.768Z">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/summary.png">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/pca_before.png">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/raw_tree.png">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/pruned_tree1.png">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/pruned_tree2.png">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/2x2ContingencyTable.png">
+<meta property="og:image" content="http://www.w-zl.com/upload/1/summary1.png">
+<meta property="og:updated_time" content="2016-06-13T02:22:12.397Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="利用决策树来识别Cufflinks中的技术噪音">
 <meta name="twitter:description" content="简介熟悉RNA-Seq分析流程的朋友大多都知道，在经典的TopHat-Cufflinks分析流程中，对于最终的转录子（transfrag）组装的结果，很难去判断是否真实存在。在实际操作中，我们一般采用简单的一刀切，来进行过滤。比如，对于FPKM&amp;lt;1的进行过滤。这种方法虽然很有效，但是可能会丢失部分有价值的信息。在这篇文章中，我向大家介绍一种基于决策树的机器学习方法来识别Cufflins结果中">
@@ -476,15 +483,95 @@
 <li>高复杂度换取高的准确度。<br>通过最小化全局指标：$$\alpha{\cdot}size+\sum_{叶节点}^{}I(N)$$这里$size$表示节点或分支的数目，$\alpha$是个正常数（类似神经网络中的正则化方法）。这种方法中，$\alpha$的设定也很难，它也与最终分类性能无简单的相关关系。</li>
 <li>不纯度下降的显著性检验。<br>估计之前的所有${\Delta}I(N)$概率分布，在对某一候选分支$i$时，检验${\Delta}I(N_i)$是否与上述分布存在统计学差异。<br><img src="/upload/1/chisq.png" alt="卡方检验" title="采取卡方检验。对于候选分支，其理论发生概率$p$对应得卡方值函数为$\frac{(1-p)^2}{p}$，在0.05的置信水平下，$p$应该大于0.18。"></li>
 <li>$\chi^2$假设检验。<br>要点是判断候选分支是否存在统计学上的意义，也就是判断分支是否明显有别于随机分支。假设节点存在$n$个样本（$n_1$个$w_1$类，$n_2$个$w_2$类），候选分支将$Pn$个样本分到左分支，$(1-P)n$分到了右支。此时假设是随机分支，左枝应该有$Pn_1$个$w_1$和$Pn_2$个$w_2$，其它剩余的都在右支。如果用$\chi^2$来评估这次分支与随机的偏离度，那偏离度$$\chi^2=\sum_{i=1}^{2}\frac{(n_{iL}-n_{ie})^2}{n_{ie}}$$其中$n_{iL}$是指$w_i$在左分支的数目，而$n_{ie}=Pn_i$则对应随机分支情况下的值。当两者相同时，$\chi^2$接近0，相反，当$\chi^2$越大，说明两者差异越大。当其大于某临界值时，就可以拒绝零假设（候选分支等于随机分支）。</li>
+<li>损失矩阵<br>构建损失矩阵，根据损失矩阵计算节点损失，当叶节点的损失大于其父节点的损失时，则停止分支。</li>
 </ol>
 <h5 id="剪枝"><a href="#剪枝" class="headerlink" title="剪枝"></a>剪枝</h5><p>有时，分支停止方法会因缺少足够的前瞻性而过早停止（视界局限效应）。这时，需要剪枝（pruning）来克服这种缺陷。在剪枝过程中，树首先要充足生长，直到叶节点都有最小不纯度值为止，因而没有任何推定的“视界局限”。然后，对所有相邻的成对叶节点，考虑能否合并它们，如果合并它们只引起很小的不纯度增长，那就合并它们为新的叶节点。</p>
 <h2 id="cufflinks中决策树的理论基础"><a href="#cufflinks中决策树的理论基础" class="headerlink" title="cufflinks中决策树的理论基础"></a>cufflinks中决策树的理论基础</h2><p>cufflinks软件原理是将mapped reads组装成transfrag，由于reads很短，拼接还原难度高。这个过程中可能会产生错误的结果。我们假设：</p>
 <ol>
 <li>同一染色体上的基因的特征相似。</li>
-<li>cufflinks产生的未知的transfrag大部分是noise，可靠的transfrag仅占小部分。<br>这样，我们就拥有了一个正样本集（真实基因），和一个负样本集（noise），这就可以建立决策树，来确认真实基因的特征。<br>在算法上，采取常用的CART算法，软件选用R语言及其rpart模块。</li>
+<li>cufflinks产生的未知的transfrag大部分是noise，可靠的transfrag仅占小部分，这些可靠的transfrag拥有与正常基因相似的特征，且与noise存在较大差异。<br>这样，我们就拥有了一个正样本集（真实基因），和一个负样本集（noise），这就可以建立决策树，来确认真实基因的特征。<br>在算法上，采取常用的CART算法，软件选用R语言及其rpart模块。</li>
 </ol>
-<h1 id="数据"><a href="#数据" class="headerlink" title="数据"></a>数据</h1><h2 id="数据来源"><a href="#数据来源" class="headerlink" title="数据来源"></a>数据来源</h2><h2 id="特征选择"><a href="#特征选择" class="headerlink" title="特征选择"></a>特征选择</h2><h1 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h1><p>一步一步</p>
-<h1 id="验证"><a href="#验证" class="headerlink" title="验证"></a>验证</h1>
+<h2 id="特征选择"><a href="#特征选择" class="headerlink" title="特征选择"></a>特征选择</h2><p>该次选取了个5特征变量：长度，外显子数目，样本中表达比例，FPKM值。</p>
+<table>
+<thead>
+<tr>
+<th>特征变量</th>
+<th>选择原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>长度</td>
+<td>人类基因90%以上都在300bp以上，过短的transfrag可能是由于技术噪音产生</td>
+</tr>
+<tr>
+<td>外显子数</td>
+<td>人类大部分基因都拥有多个外显子数，趋于更为复杂的结构；而技术噪音一般都很简单。</td>
+</tr>
+<tr>
+<td>样本中表达比例</td>
+<td>正常的基因，应该会在多个样本中都会出现表达，而部分技术噪音可能仅在个别样本中表达。</td>
+</tr>
+<tr>
+<td>FPKM值</td>
+<td>正常基因的FPKM值应该会在一定范围内，而技术噪音序列可能会存在FPKM极值。</td>
+</tr>
+</tbody>
+</table>
+<h1 id="数据建模"><a href="#数据建模" class="headerlink" title="数据建模"></a>数据建模</h1><h2 id="数据描述"><a href="#数据描述" class="headerlink" title="数据描述"></a>数据描述</h2><p>数据使用的是10个人类样本cufflinks组装结果中1号染色体上的数据。<br>数据集中共28,290个转录子，其中26,185是已知转录位点，2,105是未知转录位点。</p>
+<table>
+<thead>
+<tr>
+<th>特征变量</th>
+<th>最小值</th>
+<th>中值</th>
+<th>均值</th>
+<th>最大值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>长度</td>
+<td>1</td>
+<td>1540</td>
+<td>2679</td>
+<td>79680</td>
+</tr>
+<tr>
+<td>外显子数</td>
+<td>1</td>
+<td>5</td>
+<td>7.887</td>
+<td>100</td>
+</tr>
+<tr>
+<td>表达比例</td>
+<td>0.10</td>
+<td>0.50</td>
+<td>0.54</td>
+<td>1.00</td>
+</tr>
+<tr>
+<td>FPKM</td>
+<td>0</td>
+<td>0.115</td>
+<td>2.131</td>
+<td>5271</td>
+</tr>
+</tbody>
+</table>
+<p><img src="/upload/1/summary.png" alt="数据描述" title="数据描述(已知转录和未知转录并不能明显区分开)"><br><img src="/upload/1/pca_before.png" alt="PCA分析" title="PCA结果（无法区分）"></p>
+<h2 id="rpart包参数简介"><a href="#rpart包参数简介" class="headerlink" title="rpart包参数简介"></a>rpart包参数简介</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">函数：rpart</span><br><span class="line">用法：rpart(formula, data, weights, subset, na.action = na.rpart, method, model = FALSE, x = FALSE, y = TRUE, parms, control, cost, ...)</span><br><span class="line">参数：</span><br><span class="line">	formula：公式，例Y~X1+X2+X3+X4</span><br><span class="line">	data：数据源，一般是数据框</span><br><span class="line">	weights: 向量，各个自变量的权重</span><br><span class="line">	subset：只用特定列</span><br><span class="line">	method：如果Y是生存类，选择&quot;exp&quot;；如果Y有两列，则选择&quot;poisson&quot;；如果Y是因子，则选择&quot;class&quot;；如果Y是连续变量,则选择&quot;anova&quot;;</span><br><span class="line">	parms：分裂参数；&quot;anova&quot;类没有该参数，&quot;exp&quot;和&quot;poisson&quot;仅有先验分布；&quot;class&quot;有三项，prior对先验概率，loss对损失矩阵，split对不纯度计算方式———&quot;gini&quot;或&quot;information&quot;。</span><br><span class="line">	control：参见rpart.control</span><br><span class="line">	cost：各自变量代价列表</span><br><span class="line">函数：rpart.control</span><br><span class="line">用法：rpart.control(minsplit = 20, minbucket = round(minsplit/3), cp = 0.01, maxcompete = 4, maxsurrogate = 5, usesurrogate = 2, xval = 10, surrogatestyle = 0, maxdepth = 30, ...)</span><br><span class="line">参数：</span><br><span class="line">	minsplit：父节点最小样本数。</span><br><span class="line">	minbucket：叶节点最小样本数。</span><br><span class="line">	cp：complexity parameter.复杂性参数。分支后cp必须高于设定值。</span><br><span class="line">	maxcompete：保留的最大候选分支数。</span><br><span class="line">	maxsurrogate：替代分裂最大数。</span><br><span class="line">	usesurrogate：替代分裂处理。0，仅展示；1，使用替代分裂；2，不使用替代分裂</span><br><span class="line">	xval：cv数</span><br><span class="line">	surrogatestyle：替代分裂风格。0，数值；1，比例。</span><br><span class="line">	maxdepth：树的最大深度</span><br></pre></td></tr></table></figure>
+<h2 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h2><figure class="highlight r"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 加载rpart包</span></span><br><span class="line"><span class="keyword">library</span>(rpart)</span><br><span class="line"><span class="comment"># 构建数据框</span></span><br><span class="line">d &lt;- data.frame(length,exon,ratio,FPKM,class)</span><br><span class="line"><span class="comment"># 训练集和测试集</span></span><br><span class="line">train.l &lt;- sample(<span class="number">1</span>:dim(d)[<span class="number">1</span>],as.integer(dim(d)[<span class="number">1</span>]*<span class="number">0.7</span>)) <span class="comment">#取样列</span></span><br><span class="line">train &lt;- d[train.l,] <span class="comment">#训练集</span></span><br><span class="line">test &lt;- d[-train.l,] <span class="comment">#测试集</span></span><br><span class="line"><span class="comment"># rpart控制参数设置</span></span><br><span class="line">ct &lt;- rpart.control(xval=<span class="number">10</span>, minsplit=<span class="number">100</span>, minbucket=<span class="number">40</span>, maxdepth=<span class="number">4</span>) <span class="comment">#采用10折交叉验证；停止分裂条件：1、父节点样本小于100；2、叶节点样本大于40；3、深度小于4层；</span></span><br><span class="line"><span class="comment"># rpart建模</span></span><br><span class="line">fit&lt;-rpart(class~length+exon+rat+FPKM,train,method=<span class="string">'class'</span>,control=ct,parms = list(split = <span class="string">"information"</span>))</span><br><span class="line"><span class="comment"># 可视化</span></span><br><span class="line">plot(fit,margin=<span class="number">0.1</span>)</span><br><span class="line">text(fit,use.n=<span class="literal">T</span>) <span class="comment">#原始树</span></span><br><span class="line"><span class="comment"># 剪枝</span></span><br><span class="line">plotcp(fit)  <span class="comment">#筛选合适的cp值</span></span><br><span class="line">plot(prune(fit,cp=<span class="number">0.01</span>),margin=<span class="number">0.1</span>) </span><br><span class="line">text(prune(fit,cp=<span class="number">0.01</span>),use.n=<span class="literal">T</span>) <span class="comment">#length过拟合，增大cp值，减少</span></span><br><span class="line">plot(prune(fit,cp=<span class="number">0.045</span>),margin=<span class="number">0.1</span>)</span><br><span class="line">text(prune(fit,cp=<span class="number">0.045</span>),use.n=<span class="literal">T</span>) </span><br><span class="line"><span class="comment"># 确定模型</span></span><br><span class="line">fit.used&lt;-prune(fit,cp=<span class="number">0.045</span>)</span><br><span class="line"><span class="comment"># 精度</span></span><br><span class="line">summary(test$type == predict(fit.used,test,type=<span class="string">'class'</span>))  <span class="comment">#统计预测结果与实际结果是否相同</span></span><br><span class="line">summary(test$type[test$type != predict(fit.used,test,type=<span class="string">'class'</span>)]) <span class="comment">#统计预测结果与实际一致</span></span><br><span class="line">summary(test$type[test$type == predict(fit.used,test,type=<span class="string">'class'</span>)]) <span class="comment">#统计预测结果与实际不一致</span></span><br></pre></td></tr></table></figure>
+<p><img src="/upload/1/raw_tree.png" alt="原始树" title="原始树"><br><img src="/upload/1/pruned_tree1.png" alt="第一次剪枝" title="0.01cp值剪枝结果，过拟合严重。（默认cp值为0.01，所以与原始树一致）"><br><img src="/upload/1/pruned_tree2.png" alt="第二次剪枝" title="最终模型，0.045cp值剪枝结果，主要依靠exon和length属性进行分类"></p>
+<h2 id="模型分析"><a href="#模型分析" class="headerlink" title="模型分析"></a>模型分析</h2><p>最终的模型，只用到了两个属性。这个和之前数据描述相符（长度和外显子数勉强可以区分，表达比例和FPKM重叠严重）。将模型用于测试数据集，模型表现：<br><img src="/upload/1/2x2ContingencyTable.png" alt="2x2列联表" title="2x2列联表"><br>敏感度$TPR$:<br>$$TPR=\frac{7546}{7546+332}=0.9578573$$<br>精度$PPV$:<br>$$PPV=\frac{7546}{179+7546}=0.9768285$$<br>特异性$SPC$:<br>$$SPC=\frac{430}{430+332}=0.5643045$$<br>准确度$ACC$:<br>$$ACC=\frac{430+7546}{430+179+332+7546}=0.9397903$$<br>从上述四个指标上看，除了特异性差很多，其他指标都表现良好。考虑到unknown中有潜在的基因，特异性差也是在预料当中。<br>在将该模型用于原始数据中unknown部分再进行重新分类，2105个unknown数据中预测出641个潜在的基因，再进一步对模型分类后的数据进行描述：<br><img src="/upload/1/summary1.png" alt="预测后数据描述" title="预测后数据描述"><br>可以看出，预测后基因与技术噪音在长度和外显子数这两个属性区别更加明显。</p>
+<h1 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h1><p>相对之前的经验判断，使用了CART算法构建技术噪音过滤决策树，避免了主观判断，科学量化了过滤条件。</p>
+<h1 id="参考文献"><a href="#参考文献" class="headerlink" title="参考文献"></a>参考文献</h1><ol>
+<li>Duda R O, Hart P E, Stork D G. Pattern classification[M]. John Wiley &amp; Sons, 2012.</li>
+<li>Prensner J R, Iyer M K, Balbin O A, et al. Transcriptome sequencing across a prostate cancer cohort identifies PCAT-1, an unannotated lincRNA implicated in disease progression[J]. Nature biotechnology, 2011, 29(8): 742-749.</li>
+<li>Harrington P. 机器学习实战[J]. 人民邮电出版社, 北京, 2013.</li>
+</ol>
+
       
     </div>
     
@@ -597,7 +684,7 @@
                src="/upload/site/me.jpg"
                alt="汪自立（Zili Wang）" />
           <p class="site-author-name" itemprop="name">汪自立（Zili Wang）</p>
-          <p class="site-description motion-element" itemprop="description">this is description</p>
+          <p class="site-description motion-element" itemprop="description">关注领域：大数据、机器学习、可视化和数据爬取。</p>
         </div>
         <nav class="site-state motion-element">
           <div class="site-state-item site-state-posts">
@@ -670,7 +757,7 @@
               
             
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#简介"><span class="nav-number">1.</span> <span class="nav-text">简介</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#决策树"><span class="nav-number">1.1.</span> <span class="nav-text">决策树</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#什么是决策树"><span class="nav-number">1.1.1.</span> <span class="nav-text">什么是决策树</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#决策树分类算法"><span class="nav-number">1.1.2.</span> <span class="nav-text">决策树分类算法</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#ID3算法"><span class="nav-number">1.1.2.1.</span> <span class="nav-text">ID3算法</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#实例"><span class="nav-number">1.1.2.1.1.</span> <span class="nav-text">实例</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#C4-5算法"><span class="nav-number">1.1.2.2.</span> <span class="nav-text">C4.5算法</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#信息增益率"><span class="nav-number">1.1.2.2.1.</span> <span class="nav-text">信息增益率</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#实例-1"><span class="nav-number">1.1.2.2.2.</span> <span class="nav-text">实例</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#CART算法"><span class="nav-number">1.1.2.3.</span> <span class="nav-text">CART算法</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#分支数目"><span class="nav-number">1.1.2.3.1.</span> <span class="nav-text">分支数目</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#节点不纯度"><span class="nav-number">1.1.2.3.2.</span> <span class="nav-text">节点不纯度</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#分支停止准则"><span class="nav-number">1.1.2.3.3.</span> <span class="nav-text">分支停止准则</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#剪枝"><span class="nav-number">1.1.2.3.4.</span> <span class="nav-text">剪枝</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#cufflinks中决策树的理论基础"><span class="nav-number">1.2.</span> <span class="nav-text">cufflinks中决策树的理论基础</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#数据"><span class="nav-number">2.</span> <span class="nav-text">数据</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#数据来源"><span class="nav-number">2.1.</span> <span class="nav-text">数据来源</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#特征选择"><span class="nav-number">2.2.</span> <span class="nav-text">特征选择</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#分析"><span class="nav-number">3.</span> <span class="nav-text">分析</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#验证"><span class="nav-number">4.</span> <span class="nav-text">验证</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#简介"><span class="nav-number">1.</span> <span class="nav-text">简介</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#决策树"><span class="nav-number">1.1.</span> <span class="nav-text">决策树</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#什么是决策树"><span class="nav-number">1.1.1.</span> <span class="nav-text">什么是决策树</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#决策树分类算法"><span class="nav-number">1.1.2.</span> <span class="nav-text">决策树分类算法</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#ID3算法"><span class="nav-number">1.1.2.1.</span> <span class="nav-text">ID3算法</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#实例"><span class="nav-number">1.1.2.1.1.</span> <span class="nav-text">实例</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#C4-5算法"><span class="nav-number">1.1.2.2.</span> <span class="nav-text">C4.5算法</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#信息增益率"><span class="nav-number">1.1.2.2.1.</span> <span class="nav-text">信息增益率</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#实例-1"><span class="nav-number">1.1.2.2.2.</span> <span class="nav-text">实例</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#CART算法"><span class="nav-number">1.1.2.3.</span> <span class="nav-text">CART算法</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#分支数目"><span class="nav-number">1.1.2.3.1.</span> <span class="nav-text">分支数目</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#节点不纯度"><span class="nav-number">1.1.2.3.2.</span> <span class="nav-text">节点不纯度</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#分支停止准则"><span class="nav-number">1.1.2.3.3.</span> <span class="nav-text">分支停止准则</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#剪枝"><span class="nav-number">1.1.2.3.4.</span> <span class="nav-text">剪枝</span></a></li></ol></li></ol></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#cufflinks中决策树的理论基础"><span class="nav-number">1.2.</span> <span class="nav-text">cufflinks中决策树的理论基础</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#特征选择"><span class="nav-number">1.3.</span> <span class="nav-text">特征选择</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#数据建模"><span class="nav-number">2.</span> <span class="nav-text">数据建模</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#数据描述"><span class="nav-number">2.1.</span> <span class="nav-text">数据描述</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#rpart包参数简介"><span class="nav-number">2.2.</span> <span class="nav-text">rpart包参数简介</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#代码"><span class="nav-number">2.3.</span> <span class="nav-text">代码</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#模型分析"><span class="nav-number">2.4.</span> <span class="nav-text">模型分析</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#结论"><span class="nav-number">3.</span> <span class="nav-text">结论</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#参考文献"><span class="nav-number">4.</span> <span class="nav-text">参考文献</span></a></li></ol></div>
             
           </div>
         </section>
