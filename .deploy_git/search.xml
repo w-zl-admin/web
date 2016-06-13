@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  
+  
+    
+    <entry>
+      <title><![CDATA[利用决策树来识别Cufflinks中的技术噪音]]></title>
+      <url>http://www.w-zl.com/2015/07/26/%E5%88%A9%E7%94%A8%E5%86%B3%E7%AD%96%E6%A0%91%E6%9D%A5%E8%AF%86%E5%88%ABCufflinks%E4%B8%AD%E7%9A%84%E6%8A%80%E6%9C%AF%E5%99%AA%E9%9F%B3.html</url>
+      <content type="html"><![CDATA[<h1 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h1><p>熟悉RNA-Seq分析流程的朋友大多都知道，在经典的TopHat-Cufflinks分析流程中，对于最终的转录子（transfrag）组装的结果，很难去判断是否真实存在。在实际操作中，我们一般采用简单的一刀切，来进行过滤。比如，对于FPKM&lt;1的进行过滤。这种方法虽然很有效，但是可能会丢失部分有价值的信息。在这篇文章中，我向大家介绍一种基于决策树的机器学习方法来识别Cufflins结果中的技术噪音（Tech Noise）。</p>
+<h2 id="决策树"><a href="#决策树" class="headerlink" title="决策树"></a>决策树</h2><h3 id="什么是决策树"><a href="#什么是决策树" class="headerlink" title="什么是决策树"></a>什么是决策树</h3><p>决策树是一种依托选择策略建立的图解法。在机器学习中，决策树属于有督导学习（Supervised Learning）中分类（Classification）算法范围。决策树，经常出现在我们生活中。比如，</p>
+<blockquote>
+<p>顾客：这手机能拍照吗？<br>销售：能！<br>顾客：这手机能上网吗？<br>销售：能！<br>顾客：这手机能防水吗？<br>销售：能！<br>顾客：我买了！ </p>
+</blockquote>
+<p>用图解法表示决策过程：<br><img src="/upload/1/decisionTreeSample.png" alt="买手机决策过程图解" title="买手机决策树"><br>这样，有了上面的认识，我们可以发现：</p>
+<ul>
+<li>决策树是一个树结构（可以是二叉树或非二叉树）。</li>
+<li>决策树上的每个非叶节点表示了对某一属性的判断。</li>
+<li>非叶节点的分支表示该属性的判断结果。</li>
+<li>叶节点表示分类结果。</li>
+</ul>
+<h3 id="决策树分类算法"><a href="#决策树分类算法" class="headerlink" title="决策树分类算法"></a>决策树分类算法</h3><p>决策树中最关键步骤是分裂属性。什么是分裂属性？分裂属性是指在某个节点，根据对某个属性的判断来把该节点集合分裂为两个或多个子集合（二叉树或多叉树）。理想的分裂，应该使各个子集合中的各个元素的类别一致。这样一来，分裂属性的情况包括以下三种：</p>
+<ul>
+<li>属性是离散值且不要求生成二叉决策树。此时用属性的每一个划分作为一个分支。</li>
+<li>属性是离散值且要求生成二叉决策树。此时使用属性划分的一个子集进行测试，按照“属于此子集”和“不属于此子集”分成两个分支。</li>
+<li>属性是连续值。此时确定一个值作为分裂点split_point，按照&gt;split_point和&lt;=split_point生成两个分支。  </li>
+</ul>
+<p>这样看来，属性的量度对于决策树的构造非常重要。选择属性度量的算法有很多，大部分都是采用自顶向下递归分治法（Recursive Partitioning），同时采用不回溯的贪心策略（Greedy Strategy）。</p>
+<h4 id="ID3算法"><a href="#ID3算法" class="headerlink" title="ID3算法"></a>ID3算法</h4><p>ID3算法，全称Iterative Dichotomiser 3 ，译名迭代二叉树3代，1986年由Quinlan提出。ID3算法是以信息论为基础，以信息熵和信息增益度为衡量标准，从而实现对数据的归纳分类。即在节点处选择当前集合中最大信息增益的属性作为分裂属性，并在子集中不断递归。以下是信息论中的基本概念：</p>
+<ul>
+<li>信息熵（Entropy）<br>若信源符号有n种取值：$U_1$…$U_i$…$U_n$，对应概率为：$P_1$…$P_i$…$P_n$，且各种符号的出现彼此独立。这时，信源的平均不确定性应当为单个符号不确定性$-logP_i$的统计平均值（$E$），可称为信息熵，即$$H(U)=E\left | -logP_i \right |=-\sum_{i=0}^{n}P_ilogP_i$$式中对数一般取2为底，单位为比特。但是，也可以取其它对数底，采用其它相应的单位，它们间可用换底公式换算。 信息熵是表示随机变量不确定性的度量。从直观上，信息熵越大，变量包含的信息量越大，变量的不确定性也越大。一个事物内部会存在随机性，也就是不确定性，而从外部消除这个不确定性唯一的办法是引入信息。如果没有信息，任何公式或者数字的游戏都无法排除不确定性。<br><img src="/upload/1/EntropyFunction.png" alt="信息熵函数" title="信息熵函数"><br><img src="/upload/1/towbit.png" alt="二元信息熵" title="二元信息熵"></li>
+<li>复合熵（Composite Entropy）<br>根据贝叶斯定理，结合信息熵。复合熵函数：$$H(x,y)=E|-logP_{(x,y)}|=\sum_{x}^{ }\sum_{y}^{ }P_{(x,y)}logP_{(x,y)}=-\sum_{x}^{ }\sum_{y}^{ }P_xP_ylog(P_xP_y)$$</li>
+<li>条件熵（conditional Entropy）<br>根据贝叶斯定理，结合信息熵。条件熵函数：$$H(X|Y)=E|E|-logP_{(X|Y)}||=-\sum_{Y}^{}\sum_{X}^{}P_{Y_j}P_{(X_i|Y_j)}logP_{(X_i|Y_j)}$$</li>
+<li>信息增益（IG，Information Gain）<br>信息增益在信息论中是很有效的特征选择方法。但凡是特征选择，总是将特征的重要程度先进行量化后再进行选择，而如何量化特征的重要性，就成了各种方法最大的不同。在信息增益中，量化特征的重要性就是看特征能够为分类系统带来多少的信息，带来的信息越多，该特征就越为重要。这可以用信息熵去量化。另外需要注意的是，信息增益是针对特征而言，也就是系统中有没有某个特征间系统信息熵的变化。令$A$为分裂特征，$A_i$为A特征分裂子集，$S_n$为n类样本，$U$为所有样本集合，信息增益函数可以表示为：$$IG(A)=H(U)-H(U|A)=\sum_{j=1}^{S}\sum_{i=1}^{A}P_{A_i}P_{S_j|A_i}log(P_{S_j|A_i})-\sum_{j=1}^{S}P_{(S_j)}log(P_{(S_j)})$$</li>
+</ul>
+<p>ID3算法就是利用信息增益来量化特征的重要性。其理论在于，每次分裂实在使系统信息增益最大化的特征上进行。同时ID3只有正负两个样本（全局二叉树），根据信息增益函数，ID3可以表示为：<br>$$\max_{i}(IG(A_i))=\max_{i}(H(U)-H(U|A))=$$</p>
+<p>$$\max_{i}(P_A(P_{(\oplus|A)}logP_{(\oplus|A)}+P_{(\ominus|A)}logP_{(\ominus|A)})+(1-P_A)(P_{(\oplus|C_SA)}logP_{(\oplus|C_SA)}+P_{(\ominus|C_SA)}logP_{(\ominus|C_SA)})-P_{\oplus}logP_{\oplus}-P_{\ominus}logP_{\ominus})$$</p>
+<h5 id="实例"><a href="#实例" class="headerlink" title="实例"></a>实例</h5><p>有类数据如下表，m,n为两个特征，c表示分类。</p>
+<table>
+<thead>
+<tr>
+<th>m</th>
+<th>n</th>
+<th>c</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>+</td>
+<td>+</td>
+<td>+</td>
+</tr>
+<tr>
+<td>+</td>
+<td>+</td>
+<td>+</td>
+</tr>
+<tr>
+<td>+</td>
+<td>-</td>
+<td>+</td>
+</tr>
+<tr>
+<td>-</td>
+<td>+</td>
+<td>-</td>
+</tr>
+<tr>
+<td>-</td>
+<td>-</td>
+<td>-</td>
+</tr>
+<tr>
+<td>+</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<p>根据ID3算法对其建决策树：</p>
+<ol>
+<li>以m特征进行分裂的信息增量。<br>$$IG(m)=H(U)-H(U|A)=-(\frac{1}{2}log_2\frac{1}{2}+\frac{1}{2}log_2\frac{1}{2})-(-\frac{4}{6}(\frac{1}{4}log_2\frac{1}{4}+\frac{3}{4}log_2\frac{3}{4})-\frac{2}{6}(0+0))=0.459$$<br><img src="/upload/1/mclass.png" alt="以m特征分裂" title="以m特征分裂"></li>
+<li>以n特征进行分裂的信息增量。<br>$$IG(n)=H(U)-H(U|A)=-(\frac{1}{2}log_2\frac{1}{2}+\frac{1}{2}log_2\frac{1}{2})-(-\frac{3}{6}(\frac{1}{3}log_2\frac{1}{3}+\frac{2}{3}log_2\frac{2}{3})-\frac{3}{6}(\frac{1}{3}log_2\frac{1}{3}+\frac{2}{3}log_2\frac{2}{3}))=0.082$$<br><img src="/upload/1/nclass.png" alt="以n特征分裂" title="以n特征分裂"></li>
+<li>因为$IG(m)&gt;IG(n)$，选择信息增益最大的特征进行分裂，所以选择m进行分裂。</li>
+</ol>
+<h4 id="C4-5算法"><a href="#C4-5算法" class="headerlink" title="C4.5算法"></a>C4.5算法</h4><p>C4.5算法是ID3算法进行改进算法，主要不同点是对特征重要性量化上采用的是信息增益率（Info Gain Ratio）。这种方法解决ID3算法在某个属性存在大量不同值时导致的过拟合现象。相比于ID3算法，改进有如下几个要点：</p>
+<ul>
+<li>用信息增益率来选择属性。</li>
+<li>在决策树构造过程中可以进行剪枝。ID3算法会由于某些具有很少元素的结点可能会使构造的决策树过适应（Overfitting），这时候不考虑这些结点可能会更好。</li>
+<li>对非离散数据也能处理。</li>
+<li>能够对不完整数据进行处理。</li>
+</ul>
+<h5 id="信息增益率"><a href="#信息增益率" class="headerlink" title="信息增益率"></a>信息增益率</h5><p>分裂属性$A$，分裂后子集空间$S$，信息增益率IGR则可表示为：<br>$$IGR(S,A)=\frac{IG(S,A)}{II(S,A)}$$<br>其中II表示内在信息（Intrinsic Information），其定义为：<br>$$II(S,A)=-\sum\frac{|S_i|}{|S|}log_2\frac{|S_i|}{|S|}$$<br>其中$S_i$是属性A分割S而形成的$i$子集。</p>
+<h5 id="实例-1"><a href="#实例-1" class="headerlink" title="实例"></a>实例</h5><p>依旧上述例子</p>
+<ul>
+<li>以m特征进行分裂的信息增量。$$IGR(m)=\frac{IG(m)}{II{m}}=\frac{0.459}{\frac{4}{6}log_2\frac{4}{6}+\frac{2}{6}log_2\frac{2}{6}}=\frac{0.459}{0.918}=0.5$$</li>
+</ul>
+<h4 id="CART算法"><a href="#CART算法" class="headerlink" title="CART算法"></a>CART算法</h4><p>分类和回归树（Classification and regression tree，CART）在模式分类中被视作一种通用的树生长算法。CART提供一种通用框架，利用它，可以实例化各种各样不同的判定树。按照CART，有6个问题需要回答：</p>
+<ul>
+<li>节点分支数应该是多少？</li>
+<li>节点测试是哪个属性？</li>
+<li>何时可以令某节点成为叶节点？</li>
+<li>如何剪枝？</li>
+<li>如果叶节点仍不“纯”，那么怎样给它赋类别标记？</li>
+<li>缺省数据处理？</li>
+</ul>
+<h5 id="分支数目"><a href="#分支数目" class="headerlink" title="分支数目"></a>分支数目</h5><p>任意多类别样本都可以通过多个二叉树进行划分。所以，二叉树具有万能的表达能力，并且在训练上很简便。所以，CART一般采用二叉树结构。</p>
+<h5 id="节点不纯度"><a href="#节点不纯度" class="headerlink" title="节点不纯度"></a>节点不纯度</h5><p>CART中有四种方式来量化不纯度（Impurity）：</p>
+<ul>
+<li>信息熵不纯度（Entropy Impurity）$$I(N)=-sum_{j}^{}P(w_j)log_2P(w_j)$$</li>
+<li>方差不纯度(Variance Impurity) $$I(N)=\prod_{j}P(w_j)=P(1-P)$$</li>
+<li>Gini不纯度(Gini Impurity)$$I(N)=\sum_{j}^{}P(w_j)P(w_{C_{S}j})=1-\sum_{j}^{}P^2(w_j)$$</li>
+<li>误分类不纯度(Missclassification Impurity)$$I(N)=1-\max_{j}P(w_j)$$<br><img src="/upload/1/class.png" alt="4种不纯度量化方法" title="4种不纯度量化方法"></li>
+</ul>
+<p>在如何选择分裂属性上，很明显的启发思路是选择使不纯度下降最快的那个属性（ID3算法）。可记作$$\max_{i}{\Delta}I(N)=I(N)-P_LI(N_L)-(1-P_L)I(N_R)$$，其中$N_L$和$N_R$分别是左右子节点。这种贪心算法有个缺点，就是无法确保顺序局部优化过程能得到全局最优。实践中，熵不纯度和Gini不纯度运用广泛，但在实践过程中，不同的不纯度函数对最后的分类效果和其性能影响往往比预期的小。所以，在实践中，反倒是停止判决和剪枝算法受到更多的重视。</p>
+<h5 id="分支停止准则"><a href="#分支停止准则" class="headerlink" title="分支停止准则"></a>分支停止准则</h5><p>二叉树，分支训练中，分支过多会过拟合，分支过少，训练样本误差大，分类效果也差。究竟何时应该停止分支呢？这里介绍五种方法：</p>
+<ol>
+<li>验证和交叉验证技术（validation and cross-validation）。<br>将部分样本用于训练树，剩余样本作为验证。持续节点分支，直到对于验证集的分类误差最小化。</li>
+<li>不纯度下降门限。<br>预先设定一个不纯度下降差的（小）门限值，当候选分支小于这个值时，停止分支。这种方法有两个优点，一是全部样本均用于训练，二是树的每层都可能存在叶节点。但该方法也有个固有缺点，即门限值预先设定相当困难，因为最终性能与门限大小并无直接的函数关系</li>
+<li>节点最小样本数。<br>当候选分支样本数小于设定值，停止分支。这种方法类似k-近临分类器，当样本集中时，分割子集就小；当样本稀疏时，分割子集就大。</li>
+<li>高复杂度换取高的准确度。<br>通过最小化全局指标：$$\alpha{\cdot}size+\sum_{叶节点}^{}I(N)$$这里$size$表示节点或分支的数目，$\alpha$是个正常数（类似神经网络中的正则化方法）。这种方法中，$\alpha$的设定也很难，它也与最终分类性能无简单的相关关系。</li>
+<li>不纯度下降的显著性检验。<br>估计之前的所有${\Delta}I(N)$概率分布，在对某一候选分支$i$时，检验${\Delta}I(N_i)$是否与上述分布存在统计学差异。<br><img src="/upload/1/chisq.png" alt="卡方检验" title="采取卡方检验。对于候选分支，其理论发生概率$p$对应得卡方值函数为$\frac{(1-p)^2}{p}$，在0.05的置信水平下，$p$应该大于0.18。"></li>
+<li>$\chi^2$假设检验。<br>要点是判断候选分支是否存在统计学上的意义，也就是判断分支是否明显有别于随机分支。假设节点存在$n$个样本（$n_1$个$w_1$类，$n_2$个$w_2$类），候选分支将$Pn$个样本分到左分支，$(1-P)n$分到了右支。此时假设是随机分支，左枝应该有$Pn_1$个$w_1$和$Pn_2$个$w_2$，其它剩余的都在右支。如果用$\chi^2$来评估这次分支与随机的偏离度，那偏离度$$\chi^2=\sum_{i=1}^{2}\frac{(n_{iL}-n_{ie})^2}{n_{ie}}$$其中$n_{iL}$是指$w_i$在左分支的数目，而$n_{ie}=Pn_i$则对应随机分支情况下的值。当两者相同时，$\chi^2$接近0，相反，当$\chi^2$越大，说明两者差异越大。当其大于某临界值时，就可以拒绝零假设（候选分支等于随机分支）。</li>
+<li>损失矩阵<br>构建损失矩阵，根据损失矩阵计算节点损失，当叶节点的损失大于其父节点的损失时，则停止分支。</li>
+</ol>
+<h5 id="剪枝"><a href="#剪枝" class="headerlink" title="剪枝"></a>剪枝</h5><p>有时，分支停止方法会因缺少足够的前瞻性而过早停止（视界局限效应）。这时，需要剪枝（pruning）来克服这种缺陷。在剪枝过程中，树首先要充足生长，直到叶节点都有最小不纯度值为止，因而没有任何推定的“视界局限”。然后，对所有相邻的成对叶节点，考虑能否合并它们，如果合并它们只引起很小的不纯度增长，那就合并它们为新的叶节点。</p>
+<h2 id="cufflinks中决策树的理论基础"><a href="#cufflinks中决策树的理论基础" class="headerlink" title="cufflinks中决策树的理论基础"></a>cufflinks中决策树的理论基础</h2><p>cufflinks软件原理是将mapped reads组装成transfrag，由于reads很短，拼接还原难度高。这个过程中可能会产生错误的结果。我们假设：</p>
+<ol>
+<li>同一染色体上的基因的特征相似。</li>
+<li>cufflinks产生的未知的transfrag大部分是noise，可靠的transfrag仅占小部分，这些可靠的transfrag拥有与正常基因相似的特征，且与noise存在较大差异。<br>这样，我们就拥有了一个正样本集（真实基因），和一个负样本集（noise），这就可以建立决策树，来确认真实基因的特征。<br>在算法上，采取常用的CART算法，软件选用R语言及其rpart模块。</li>
+</ol>
+<h2 id="特征选择"><a href="#特征选择" class="headerlink" title="特征选择"></a>特征选择</h2><p>该次选取了个5特征变量：长度，外显子数目，样本中表达比例，FPKM值。</p>
+<table>
+<thead>
+<tr>
+<th>特征变量</th>
+<th>选择原因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>长度</td>
+<td>人类基因90%以上都在300bp以上，过短的transfrag可能是由于技术噪音产生</td>
+</tr>
+<tr>
+<td>外显子数</td>
+<td>人类大部分基因都拥有多个外显子数，趋于更为复杂的结构；而技术噪音一般都很简单。</td>
+</tr>
+<tr>
+<td>样本中表达比例</td>
+<td>正常的基因，应该会在多个样本中都会出现表达，而部分技术噪音可能仅在个别样本中表达。</td>
+</tr>
+<tr>
+<td>FPKM值</td>
+<td>正常基因的FPKM值应该会在一定范围内，而技术噪音序列可能会存在FPKM极值。</td>
+</tr>
+</tbody>
+</table>
+<h1 id="数据建模"><a href="#数据建模" class="headerlink" title="数据建模"></a>数据建模</h1><h2 id="数据描述"><a href="#数据描述" class="headerlink" title="数据描述"></a>数据描述</h2><p>数据使用的是10个人类样本cufflinks组装结果中1号染色体上的数据。<br>数据集中共28,290个转录子，其中26,185是已知转录位点，2,105是未知转录位点。</p>
+<table>
+<thead>
+<tr>
+<th>特征变量</th>
+<th>最小值</th>
+<th>中值</th>
+<th>均值</th>
+<th>最大值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>长度</td>
+<td>1</td>
+<td>1540</td>
+<td>2679</td>
+<td>79680</td>
+</tr>
+<tr>
+<td>外显子数</td>
+<td>1</td>
+<td>5</td>
+<td>7.887</td>
+<td>100</td>
+</tr>
+<tr>
+<td>表达比例</td>
+<td>0.10</td>
+<td>0.50</td>
+<td>0.54</td>
+<td>1.00</td>
+</tr>
+<tr>
+<td>FPKM</td>
+<td>0</td>
+<td>0.115</td>
+<td>2.131</td>
+<td>5271</td>
+</tr>
+</tbody>
+</table>
+<p><img src="/upload/1/summary.png" alt="数据描述" title="数据描述(已知转录和未知转录并不能明显区分开)"><br><img src="/upload/1/pca_before.png" alt="PCA分析" title="PCA结果（无法区分）"></p>
+<h2 id="rpart包参数简介"><a href="#rpart包参数简介" class="headerlink" title="rpart包参数简介"></a>rpart包参数简介</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">函数：rpart</span><br><span class="line">用法：rpart(formula, data, weights, subset, na.action = na.rpart, method, model = FALSE, x = FALSE, y = TRUE, parms, control, cost, ...)</span><br><span class="line">参数：</span><br><span class="line">	formula：公式，例Y~X1+X2+X3+X4</span><br><span class="line">	data：数据源，一般是数据框</span><br><span class="line">	weights: 向量，各个自变量的权重</span><br><span class="line">	subset：只用特定列</span><br><span class="line">	method：如果Y是生存类，选择&quot;exp&quot;；如果Y有两列，则选择&quot;poisson&quot;；如果Y是因子，则选择&quot;class&quot;；如果Y是连续变量,则选择&quot;anova&quot;;</span><br><span class="line">	parms：分裂参数；&quot;anova&quot;类没有该参数，&quot;exp&quot;和&quot;poisson&quot;仅有先验分布；&quot;class&quot;有三项，prior对先验概率，loss对损失矩阵，split对不纯度计算方式———&quot;gini&quot;或&quot;information&quot;。</span><br><span class="line">	control：参见rpart.control</span><br><span class="line">	cost：各自变量代价列表</span><br><span class="line">函数：rpart.control</span><br><span class="line">用法：rpart.control(minsplit = 20, minbucket = round(minsplit/3), cp = 0.01, maxcompete = 4, maxsurrogate = 5, usesurrogate = 2, xval = 10, surrogatestyle = 0, maxdepth = 30, ...)</span><br><span class="line">参数：</span><br><span class="line">	minsplit：父节点最小样本数。</span><br><span class="line">	minbucket：叶节点最小样本数。</span><br><span class="line">	cp：complexity parameter.复杂性参数。分支后cp必须高于设定值。</span><br><span class="line">	maxcompete：保留的最大候选分支数。</span><br><span class="line">	maxsurrogate：替代分裂最大数。</span><br><span class="line">	usesurrogate：替代分裂处理。0，仅展示；1，使用替代分裂；2，不使用替代分裂</span><br><span class="line">	xval：cv数</span><br><span class="line">	surrogatestyle：替代分裂风格。0，数值；1，比例。</span><br><span class="line">	maxdepth：树的最大深度</span><br></pre></td></tr></table></figure>
+<h2 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h2><figure class="highlight r"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 加载rpart包</span></span><br><span class="line"><span class="keyword">library</span>(rpart)</span><br><span class="line"><span class="comment"># 构建数据框</span></span><br><span class="line">d &lt;- data.frame(length,exon,ratio,FPKM,class)</span><br><span class="line"><span class="comment"># 训练集和测试集</span></span><br><span class="line">train.l &lt;- sample(<span class="number">1</span>:dim(d)[<span class="number">1</span>],as.integer(dim(d)[<span class="number">1</span>]*<span class="number">0.7</span>)) <span class="comment">#取样列</span></span><br><span class="line">train &lt;- d[train.l,] <span class="comment">#训练集</span></span><br><span class="line">test &lt;- d[-train.l,] <span class="comment">#测试集</span></span><br><span class="line"><span class="comment"># rpart控制参数设置</span></span><br><span class="line">ct &lt;- rpart.control(xval=<span class="number">10</span>, minsplit=<span class="number">100</span>, minbucket=<span class="number">40</span>, maxdepth=<span class="number">4</span>) <span class="comment">#采用10折交叉验证；停止分裂条件：1、父节点样本小于100；2、叶节点样本大于40；3、深度小于4层；</span></span><br><span class="line"><span class="comment"># rpart建模</span></span><br><span class="line">fit&lt;-rpart(class~length+exon+rat+FPKM,train,method=<span class="string">'class'</span>,control=ct,parms = list(split = <span class="string">"information"</span>))</span><br><span class="line"><span class="comment"># 可视化</span></span><br><span class="line">plot(fit,margin=<span class="number">0.1</span>)</span><br><span class="line">text(fit,use.n=<span class="literal">T</span>) <span class="comment">#原始树</span></span><br><span class="line"><span class="comment"># 剪枝</span></span><br><span class="line">plotcp(fit)  <span class="comment">#筛选合适的cp值</span></span><br><span class="line">plot(prune(fit,cp=<span class="number">0.01</span>),margin=<span class="number">0.1</span>) </span><br><span class="line">text(prune(fit,cp=<span class="number">0.01</span>),use.n=<span class="literal">T</span>) <span class="comment">#length过拟合，增大cp值，减少</span></span><br><span class="line">plot(prune(fit,cp=<span class="number">0.045</span>),margin=<span class="number">0.1</span>)</span><br><span class="line">text(prune(fit,cp=<span class="number">0.045</span>),use.n=<span class="literal">T</span>) </span><br><span class="line"><span class="comment"># 确定模型</span></span><br><span class="line">fit.used&lt;-prune(fit,cp=<span class="number">0.045</span>)</span><br><span class="line"><span class="comment"># 精度</span></span><br><span class="line">summary(test$type == predict(fit.used,test,type=<span class="string">'class'</span>))  <span class="comment">#统计预测结果与实际结果是否相同</span></span><br><span class="line">summary(test$type[test$type != predict(fit.used,test,type=<span class="string">'class'</span>)]) <span class="comment">#统计预测结果与实际一致</span></span><br><span class="line">summary(test$type[test$type == predict(fit.used,test,type=<span class="string">'class'</span>)]) <span class="comment">#统计预测结果与实际不一致</span></span><br></pre></td></tr></table></figure>
+<p><img src="/upload/1/raw_tree.png" alt="原始树" title="原始树"><br><img src="/upload/1/pruned_tree1.png" alt="第一次剪枝" title="0.01cp值剪枝结果，过拟合严重。（默认cp值为0.01，所以与原始树一致）"><br><img src="/upload/1/pruned_tree2.png" alt="第二次剪枝" title="最终模型，0.045cp值剪枝结果，主要依靠exon和length属性进行分类"></p>
+<h2 id="模型分析"><a href="#模型分析" class="headerlink" title="模型分析"></a>模型分析</h2><p>最终的模型，只用到了两个属性。这个和之前数据描述相符（长度和外显子数勉强可以区分，表达比例和FPKM重叠严重）。将模型用于测试数据集，模型表现：<br><img src="/upload/1/2x2ContingencyTable.png" alt="2x2列联表" title="2x2列联表"><br>敏感度$TPR$:<br>$$TPR=\frac{7546}{7546+332}=0.9578573$$<br>精度$PPV$:<br>$$PPV=\frac{7546}{179+7546}=0.9768285$$<br>特异性$SPC$:<br>$$SPC=\frac{430}{430+332}=0.5643045$$<br>准确度$ACC$:<br>$$ACC=\frac{430+7546}{430+179+332+7546}=0.9397903$$<br>从上述四个指标上看，除了特异性差很多，其他指标都表现良好。考虑到unknown中有潜在的基因，特异性差也是在预料当中。<br>在将该模型用于原始数据中unknown部分再进行重新分类，2105个unknown数据中预测出641个潜在的基因，再进一步对模型分类后的数据进行描述：<br><img src="/upload/1/summary1.png" alt="预测后数据描述" title="预测后数据描述"><br>可以看出，预测后基因与技术噪音在长度和外显子数这两个属性区别更加明显。</p>
+<h1 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h1><p>相对之前的经验判断，使用了CART算法构建技术噪音过滤决策树，避免了主观判断，科学量化了过滤条件。</p>
+<h1 id="参考文献"><a href="#参考文献" class="headerlink" title="参考文献"></a>参考文献</h1><ol>
+<li>Duda R O, Hart P E, Stork D G. Pattern classification[M]. John Wiley &amp; Sons, 2012.</li>
+<li>Prensner J R, Iyer M K, Balbin O A, et al. Transcriptome sequencing across a prostate cancer cohort identifies PCAT-1, an unannotated lincRNA implicated in disease progression[J]. Nature biotechnology, 2011, 29(8): 742-749.</li>
+<li>Harrington P. 机器学习实战[J]. 人民邮电出版社, 北京, 2013.</li>
+</ol>
+]]></content>
+    </entry>
+    
+  
+  
+</search>

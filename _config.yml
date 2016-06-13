@@ -73,7 +73,7 @@ theme: hexo-theme-next-5.0.1
 deploy:
   type: git
   repo: https://github.com/w-zl-admin/public.git
-  branch: public
+  branch: master
  
 search:
   path: search.xml
